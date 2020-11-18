@@ -1,0 +1,4 @@
+﻿  Server.cpp
+C:\Users\user\source\repos\NGPProjectServer\NGPProjectServer\Server.cpp(25,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Position' 왼쪽은 무시됩니다.
+C:\Users\user\source\repos\NGPProjectServer\NGPProjectServer\Server.cpp(34,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Player' 왼쪽은 무시됩니다.
+  NGPProjectServer.vcxproj -> C:\Users\user\source\repos\NGPProjectServer\Debug\NGPProjectServer.exe
