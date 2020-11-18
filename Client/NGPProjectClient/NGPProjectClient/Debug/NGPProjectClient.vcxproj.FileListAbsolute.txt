@@ -1,0 +1,2 @@
+C:\Users\ASUS\Desktop\NGPProjectClient\NGPProjectClient\Debug\NGPProjectClient.exe
+C:\Users\ASUS\Desktop\NGPProjectClient\NGPProjectClient\Debug\NGPProjectClient.pdb
