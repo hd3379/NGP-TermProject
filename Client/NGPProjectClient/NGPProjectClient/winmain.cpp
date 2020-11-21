@@ -65,10 +65,6 @@ struct Enemy
 	Position bullets[MAX_ENEMY_BULLET];
 };
 
-Enemy enemy;
-Player players[MAX_PLAYER];
-GAME_STATE curr_state;
-
 template<class T>
 bool SendData(SOCKET sock, T* data, int len)
 {
@@ -117,9 +113,15 @@ bool RecvData(SOCKET sock, T* data)
 	return true;
 }
 
+void RecvID(SOCKET sock);
 void RecvGameState(SOCKET sock);
 void SendPlayerInfo(SOCKET sock);
 void RecvAllPlayerInfo(SOCKET sock);
+
+Enemy enemy;
+Player players[MAX_PLAYER];
+GAME_STATE curr_state;
+int myID;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	LPSTR lpszCmdParam, int nCmdShow)
@@ -285,9 +287,13 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	serveraddr.sin_port = htons(SERVERPORT);
 	retval = connect(sock, (SOCKADDR*)&serveraddr, sizeof(serveraddr));
 	if (retval == SOCKET_ERROR) err_quit("connect()");
-	int len;
+
+	//네이글 알고리즘 중지
+	bool optval = TRUE;
+	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
 
 	// 서버와 데이터 통신
+	RecvID(sock);
 	while (1) {
 		RecvGameState(sock);
 		switch (curr_state)
@@ -1438,6 +1444,12 @@ int recvn(SOCKET s, char* buf, int len, int flags)
 	return (len - left);
 }
 
+void RecvID(SOCKET sock)
+{
+	if (!RecvData(sock, &myID))
+		return;
+}
+
 void RecvGameState(SOCKET sock)
 {
 	if (!RecvData(sock, &curr_state))
@@ -1446,13 +1458,13 @@ void RecvGameState(SOCKET sock)
 
 void SendPlayerInfo(SOCKET sock)
 {
-	if (!SendData(sock, &players[0].number, sizeof(players[0].number)))
+	if (!SendData(sock, &players[myID].number, sizeof(players[myID].number)))
 		return;
 
-	if (!SendData(sock, &players[0].pos, sizeof(players[0].pos)))
+	if (!SendData(sock, &players[myID].pos, sizeof(players[myID].pos)))
 		return;
 
-	if (!SendData(sock, &players[0].is_click, sizeof(players[0].is_click)))
+	if (!SendData(sock, &players[myID].is_click, sizeof(players[myID].is_click)))
 		return;
 }
 

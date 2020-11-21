@@ -90,6 +90,9 @@ void CBullet::Move(RECT rc) {
 	}
 }
 
+CRITICAL_SECTION cs;
+HANDLE client_thread, recv_event;
+
 Enemy enemy;
 Player players[MAX_PLAYER];
 GAME_STATE curr_state;
@@ -149,10 +152,10 @@ bool RecvData(SOCKET sock, T* data)
 
 void InitalizeGameData();
 void UpdateGameState();
+void SendID(SOCKET sock);
 void SendGameState(SOCKET sock);
 void RecvPlayerInfo(SOCKET sock);
 void SendAllPlayerInfo(SOCKET sock);
-
 
 unsigned WINAPI ProcessClient(LPVOID arg);
 
@@ -185,7 +188,11 @@ int main()
 	SOCKET client_socket;
 	SOCKADDR_IN client_address;
 	int client_address_length;
-	HANDLE thread;
+
+	InitializeCriticalSection(&cs);
+	recv_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+	if (recv_event == NULL)
+		return 1;
 
 	InitalizeGameData();
 
@@ -203,16 +210,17 @@ int main()
 		printf("[TCP 서버] 클라이언트가 접속했습니다.\n IP 주소 : %s, 포트 번호 : %d\n",
 			inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
 
-		thread = (HANDLE)_beginthreadex(NULL, 0, ProcessClient, (LPVOID)client_socket, 0, NULL);
-		if (thread == NULL)
+		client_thread = (HANDLE)_beginthreadex(NULL, 0, ProcessClient, (LPVOID)client_socket, 0, NULL);
+		if (client_thread == NULL)
 			closesocket(client_socket);
 		else
-			CloseHandle(thread);
+			CloseHandle(client_thread);
 	}
 
 	closesocket(listen_socket);
-
+	DeleteCriticalSection(&cs);
 	WSACleanup();
+
 	return 0;
 }
 
@@ -296,6 +304,7 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 	client_address_length = sizeof(client_address);
 	getpeername(client_socket, (SOCKADDR*)&client_address, &client_address_length);
 
+	SendID(client_socket);
 	while (true)
 	{
 		UpdateGameState();
@@ -307,6 +316,9 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 			break;
 		case GAME_STATE::RUNNING:
 			RecvPlayerInfo(client_socket);
+
+			WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+
 			//Update();
 			//CollisionCheck();
 			SendAllPlayerInfo(client_socket);
@@ -340,6 +352,16 @@ void UpdateGameState()
 			curr_state = GAME_STATE::END;
 }
 
+void SendID(SOCKET sock)
+{
+	if (!SendData(sock, &num_player, sizeof(num_player)))
+		return;
+
+	EnterCriticalSection(&cs);
+	num_player++;
+	LeaveCriticalSection(&cs);
+}
+
 void SendGameState(SOCKET sock)
 {
 	curr_state = GAME_STATE::RUNNING;
@@ -360,6 +382,8 @@ void RecvPlayerInfo(SOCKET sock)
 
 	if (!RecvData(sock, &players[number].is_click))
 		return;
+
+	SetEvent(recv_event);
 }
 
 void SendAllPlayerInfo(SOCKET sock)
