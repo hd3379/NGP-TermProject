@@ -99,8 +99,60 @@ void error_display(const char* message);
 void error_quit(const char* message);
 int recvn(SOCKET socket, char* buffer, int length, int flags);
 
+template<class T>
+bool SendData(SOCKET sock, T* data, int len)
+{
+	int retval;
+
+	retval = send(sock, (char*)&len, sizeof(int), 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("고정 길이 send()");
+		return false;
+	}
+
+	retval = send(sock, (char*)&(*data), len, 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("가변 길이 send()");
+		return false;
+	}
+
+	return true;
+}
+
+template<class T>
+bool RecvData(SOCKET sock, T* data)
+{
+	int retval, len;
+
+	retval = recvn(sock, (char*)&len, sizeof(int), 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("고정 길이 recv()");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	retval = recvn(sock, (char*)&(*data), len, 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("가변 길이 recv()");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	return true;
+}
+
 void InitalizeGameData();
 void UpdateGameState();
+void SendGameState(SOCKET sock);
+void RecvPlayerInfo(SOCKET sock);
+void SendAllPlayerInfo(SOCKET sock);
+
 
 unsigned WINAPI ProcessClient(LPVOID arg);
 
@@ -247,17 +299,17 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 	while (true)
 	{
 		UpdateGameState();
-		//SendGameState();
+		SendGameState(client_socket);
 		switch (curr_state)
 		{
 		case GAME_STATE::TITLE:
 			//SendLogo();
 			break;
 		case GAME_STATE::RUNNING:
-			//RecvPlayerInfo();
+			RecvPlayerInfo(client_socket);
 			//Update();
 			//CollisionCheck();
-			//SendAllPlayerInfo();
+			SendAllPlayerInfo(client_socket);
 			//SendEnemyInfo();
 			break;
 		case GAME_STATE::END:
@@ -286,4 +338,44 @@ void UpdateGameState()
 	for (const auto& player : players)
 		if (player.hp < 0)
 			curr_state = GAME_STATE::END;
+}
+
+void SendGameState(SOCKET sock)
+{
+	curr_state = GAME_STATE::RUNNING;
+
+	if (!SendData(sock, &curr_state, sizeof(curr_state)))
+		return;
+}
+
+void RecvPlayerInfo(SOCKET sock)
+{
+	int number;
+
+	if (!RecvData(sock, &number))
+		return;
+
+	if (!RecvData(sock, &players[number].pos))
+		return;
+
+	if (!RecvData(sock, &players[number].is_click))
+		return;
+}
+
+void SendAllPlayerInfo(SOCKET sock)
+{
+	for (int i = 0; i < MAX_PLAYER; ++i)
+	{
+		if (!SendData(sock, &players[i].number, sizeof(players[i].number)))
+			return;
+
+		if (!SendData(sock, &players[i].hp, sizeof(players[i].hp)))
+			return;
+
+		if (!SendData(sock, &players[i].pos, sizeof(players[i].pos)))
+			return;
+
+		if (!SendData(sock, &players[i].bullets, sizeof(players[i].bullets)))
+			return;
+	}
 }
