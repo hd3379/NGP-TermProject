@@ -19,6 +19,8 @@ void err_display(char* msg);
 int recvn(SOCKET s, char* buf, int len, int flags);
 // 소켓 통신 스레드 함수
 DWORD WINAPI ClientMain(LPVOID arg);
+void RecvLogo(SOCKET socket);
+void RecvEnding(SOCKET socket);
 
 SOCKET sock; // 소켓
 char buf[BUFSIZE + 1]; // 데이터 송수신 버퍼
@@ -182,6 +184,8 @@ HBITMAP Background;
 HBITMAP Button;
 HBITMAP TITLE;
 
+int win;
+int num_player;
 
 // TCP 클라이언트 시작 부분
 DWORD WINAPI ClientMain(LPVOID arg)
@@ -213,7 +217,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 		switch (curr_state)
 		{
 		case GAME_STATE::TITLE:
-			//RecvLogo();
+			RecvLogo(sock);
 			break;
 		case GAME_STATE::RUNNING:
 			//SendPlayerInfo();
@@ -221,7 +225,7 @@ DWORD WINAPI ClientMain(LPVOID arg)
 			//RecvEnemyInfo();
 			break;
 		case GAME_STATE::END:
-			//RecvEnding();
+			RecvEnding(sock);
 			break;
 		default:
 			break;
@@ -230,6 +234,15 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	return 0;
 }
 
+void RecvLogo(SOCKET socket)
+{
+	recvn(socket, (char*)num_player, sizeof(int), 0);
+}
+
+void RecvEnding(SOCKET socket)
+{
+	recvn(socket, (char*)win, sizeof(int), 0);
+}
 
 
 void LOGO(HDC hdc,RECT rc) {
@@ -436,8 +449,7 @@ static int round_count = 1;
 static int life_point = 3;
 static int skill_1_point = 3;
 static int skill_2_point = 3;
-bool gameover;
-bool win;
+
 LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	HDC hdc, memDC;
@@ -451,7 +463,6 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	
 	static bool butterfly;
 	static bool shoot;
-	static bool imsiDondead;
 	static CBullet Rattack[20];
 	static CBullet Cattack[2001];
 	static int Cattack_num;
@@ -473,623 +484,14 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_CREATE:
 		GetClientRect(hWnd, &rect);
-		Time = 0;
-		reimu_x = 325;
-		reimu_y = 750;
-		cirno_hp = 250;
-		cirno_xplus = 3;
-		cirno_x = 100;
-		cirno_y = 105;
-		yuyuko_x = 310;
-		yuyuko_y = 100;
-		yuyuko_hp = 420;
-		Dondead = 0;
-		butterfly = 0;
-		imsiDondead = 0;
-		win = 0;
-		shoot = 0; 
 		PlaySound(TEXT("cirnosong.wav"), NULL, SND_ASYNC | SND_LOOP);
-		SetTimer(hWnd, 1, 200, NULL);
-		SetTimer(hWnd, 2, 70, NULL);
-		SetTimer(hWnd, 3, 70, NULL);
-		Rattack_num = 0;
-		Cattack_num = 0;
+		
 		break;
 
 	case WM_LBUTTONDOWN:
 
 		shoot = 1;
 		
-		break;
-	case WM_TIMER:
-		switch (wParam) {
-		case 1:
-			if (shoot == 1) {
-				Rattack_num++;
-			if (Rattack_num >= 20)
-				Rattack_num = 0;
-				Rattack[Rattack_num].Alive = TRUE;
-				Rattack[Rattack_num].X = reimu_x;
-				Rattack[Rattack_num].Y = reimu_y;
-				Rattack[Rattack_num].Speed = 20;
-				Rattack[Rattack_num].SpeedRate = 0;
-				Rattack[Rattack_num].Angle = -90;
-				Rattack[Rattack_num].AngleRate = 0;
-			}
-			
-			break;
-		case 2:
-			for (int i = 0; i < 20; i++) {
-				if (Rattack[i].Alive == TRUE) {
-					Rattack[i].Move(rect);
-					if (round_count == 1) {
-						if ((Rattack[i].X > cirno_x - 45) && (Rattack[i].X < cirno_x + 45) && (Rattack[i].Y > cirno_y - 75) && (Rattack[i].Y < cirno_y + 60)) {
-							cirno_hp--;
-							if (cirno_hp < 0) {
-								round_count = 2;
-								Cattack_num = 0;
-								Time = 0;
-								for (int i = 0; i < 2000; i++) {
-									Cattack[i].Alive = false;
-								}
-							}
-							Rattack[i].Alive = false;
-						}
-					}
-					else if (round_count == 2) {
-						if ((Rattack[i].X > yuyuko_x - 45) && (Rattack[i].X < yuyuko_x + 45) && (Rattack[i].Y > yuyuko_y - 75) && (Rattack[i].Y < yuyuko_y + 60)) {
-							yuyuko_hp--;
-							if (yuyuko_hp < 0) {
-								win = 1;
-								Cattack_num = 0;
-								Time = 0;
-								for (int i = 0; i < 2000; i++) {
-									Cattack[i].Alive = false;
-								}
-							}
-							Rattack[i].Alive = false;
-						}
-					}
-				}
-			}
-			
-			for (int i = 0; i < 2000; i++) {
-				if (Cattack[i].Alive == TRUE) {
-					Cattack[i].Move(rect);
-					if (sqrt(pow(reimu_x - Cattack[i].X, 2) + pow(reimu_y - Cattack[i].Y, 2)) < 26) {
-						if (Dondead == 0) {
-							if (imsiDondead == 0) {
-								life_point--;
-								if (life_point <= 0)
-									gameover = 1;
-								else
-								{
-									imsiDondead = 1;
-									SetTimer(hWnd, 5, 2000, NULL);
-								}
-								Cattack[i].Alive = false;
-							}
-						}
-					}
-				}
-			}
-			if (round_count == 1) {
-				cirno_x += cirno_xplus;
-				if (cirno_x - 30 <= rect.left || cirno_x + 30 >= rect.right) {
-					cirno_xplus *= -1;
-					cirno_x += cirno_xplus;
-				}
-			}
-			break;
-		case 3:
-			//시간별탄막
-			Time += 1;
-			if (round_count == 1) {
-				if (Time < 30) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 20;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = 90;
-					Cattack[Cattack_num].AngleRate = 0;
-				}
-				else if (Time < 40) {}
-				else if (Time < 70) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 20;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = 90;
-					Cattack[Cattack_num].AngleRate = 0;
-				}
-				else if (Time < 80) {}
-				else if (Time < 110) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 20;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = 90;
-					Cattack[Cattack_num].AngleRate = 0;
-				}
-				else if (Time < 120) {	}
-				else if (Time < 160) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 20;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = 90;
-					Cattack[Cattack_num].AngleRate = 0;
-				}
-				else if(Time < 180){}
-				else if (Time < 260) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 20;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = Time*3-180;
-					Cattack[Cattack_num].AngleRate = 0;
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 20;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = Time*3;
-					Cattack[Cattack_num].AngleRate = 0;
-				}
-				else if (Time < 270) {}
-				else if (Time < 400) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 6;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = Time*8;
-					Cattack[Cattack_num].AngleRate = 1;
-				}
-				else if (Time < 600) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 6;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = -Time * 8;
-					Cattack[Cattack_num].AngleRate = -1;
-				}
-				else if (Time < 610) {}
-				else if (Time < 800) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 6;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = Time*8;
-					Cattack[Cattack_num].AngleRate = 1;
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 6;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = -Time * 8;
-					Cattack[Cattack_num].AngleRate = -1;
-				}
-				else if (Time < 867) {
-					cirno_xplus = 0;
-					static int cirno_yp = 0;
-					static int cirno_xp = 0;
-					if (Time < 806) {
-						cirno_xp = 20;
-						cirno_yp = 20;
-						break;
-					}
-					if (Time < 821) {
-						cirno_x += cirno_xp;
-						cirno_y += cirno_yp;
-					}
-					else if (Time < 836) {
-						cirno_x -= cirno_xp;
-						cirno_y -= cirno_yp;
-					}
-					else if (Time < 837) {
-						cirno_xp = -20;
-						cirno_yp = 20;
-					}
-					else if (Time < 854) {
-						cirno_x += cirno_xp;
-						cirno_y += cirno_yp;
-					}
-					else if (Time < 867) {
-						cirno_x -= cirno_xp;
-						cirno_y -= cirno_yp;
-					}
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = 3;
-					Cattack[Cattack_num].SpeedRate = 0;
-					Cattack[Cattack_num].Angle = 90;
-					Cattack[Cattack_num].AngleRate = 0;
-				}
-				else if (Time < 890) {}
-				else if (Time < 2000) {
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = rand()%20+2;
-					Cattack[Cattack_num].SpeedRate = rand()%3;
-					Cattack[Cattack_num].Angle = rand()%360;
-					Cattack[Cattack_num].AngleRate = rand()%5;
-					Cattack_num++;
-					if (Cattack_num >= 2000)
-						Cattack_num = 0;
-					Cattack[Cattack_num].Alive = TRUE;
-					Cattack[Cattack_num].X = cirno_x;
-					Cattack[Cattack_num].Y = cirno_y;
-					Cattack[Cattack_num].Speed = rand() % 20+2;
-					Cattack[Cattack_num].SpeedRate = rand() % 5;
-					Cattack[Cattack_num].Angle = rand() % 360;
-					Cattack[Cattack_num].AngleRate = rand() % 5;
-				}
-			}
-			else if (round_count == 2) {
-				if(Time < 20){}
-				else if (Time < 160) {
-					if (Time > 20) {
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = 200;
-						Cattack[Cattack_num].Y = 200;
-						Cattack[Cattack_num].Speed = 2;
-						Cattack[Cattack_num].SpeedRate = 1;
-						Cattack[Cattack_num].Angle = 90;
-						Cattack[Cattack_num].AngleRate = 15;
-					}
-					if (Time > 50) {
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = 400;
-						Cattack[Cattack_num].Y = 200;
-						Cattack[Cattack_num].Speed = 2;
-						Cattack[Cattack_num].SpeedRate = 1;
-						Cattack[Cattack_num].Angle = 90;
-						Cattack[Cattack_num].AngleRate = -15;
-					}
-					if (Time > 80) {
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = 200;
-						Cattack[Cattack_num].Y = 600;
-						Cattack[Cattack_num].Speed = 2;
-						Cattack[Cattack_num].SpeedRate = 1;
-						Cattack[Cattack_num].Angle = 0;
-						Cattack[Cattack_num].AngleRate = 15;
-					}
-					if (Time > 120) {
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = 400;
-						Cattack[Cattack_num].Y = 600;
-						Cattack[Cattack_num].Speed = 2;
-						Cattack[Cattack_num].SpeedRate = 1;
-						Cattack[Cattack_num].Angle = 90;
-						Cattack[Cattack_num].AngleRate = -15;
-					}
-				}
-				else if (Time < 250) {}
-				else if(Time < 500){
-					butterfly = 1;
-					if (Time % 2 == 0) {
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = 50;
-						Cattack[Cattack_num].Y = rand() % 800 + 50;
-						Cattack[Cattack_num].Speed = 5;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = 0;
-						Cattack[Cattack_num].AngleRate = 0;
-					}
-				}
-				else if (Time < 600) {}
-				else if (Time < 900) {
-					butterfly = 0;
-					if (Time % 3 == 0) {
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 5;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6;
-						Cattack[Cattack_num].AngleRate = 1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6;
-						Cattack[Cattack_num].AngleRate = -1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 90;
-						Cattack[Cattack_num].AngleRate = 1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 90;
-						Cattack[Cattack_num].AngleRate = -1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 180;
-						Cattack[Cattack_num].AngleRate = 1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 180;
-						Cattack[Cattack_num].AngleRate = -1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 270;
-						Cattack[Cattack_num].AngleRate = 1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 270;
-						Cattack[Cattack_num].AngleRate = -1;
-					}
-				}
-				else if (Time < 920) {}
-				else if(Time <930){
-					static int i = 9;
-					for (int j = 19; j >= 0; j--) {
-						if (pattern[i][j] == '#') {
-							Cattack_num++;
-							if (Cattack_num >= 2000)
-								Cattack_num = 0;
-							Cattack[Cattack_num].Alive = TRUE;
-							Cattack[Cattack_num].X = 100 + j*10;
-							Cattack[Cattack_num].Y = 100;
-							Cattack[Cattack_num].Speed = 10;
-							Cattack[Cattack_num].SpeedRate = 0;
-							Cattack[Cattack_num].Angle = 90;
-							Cattack[Cattack_num].AngleRate = 0;
-						}
-					}
-					i--;
-				}
-				else if(Time < 940){
-					static int i = 9;
-					for (int j = 19; j >= 0; j--) {
-						if (pattern[i][j] == '#') {
-							Cattack_num++;
-							if (Cattack_num >= 2000)
-								Cattack_num = 0;
-							Cattack[Cattack_num].Alive = TRUE;
-							Cattack[Cattack_num].X = 500 + j * 10;
-							Cattack[Cattack_num].Y = 100;
-							Cattack[Cattack_num].Speed = 10;
-							Cattack[Cattack_num].SpeedRate = 0;
-							Cattack[Cattack_num].Angle = 90;
-							Cattack[Cattack_num].AngleRate = 0;
-						}
-					}
-					i--;
-				}
-				else if (Time < 950) {
-					static int i = 9;
-					for (int j = 19; j >= 0; j--) {
-						if (pattern[i][j] == '#') {
-							Cattack_num++;
-							if (Cattack_num >= 2000)
-								Cattack_num = 0;
-							Cattack[Cattack_num].Alive = TRUE;
-							Cattack[Cattack_num].X = 100 + j * 10;
-							Cattack[Cattack_num].Y = 100;
-							Cattack[Cattack_num].Speed = 10;
-							Cattack[Cattack_num].SpeedRate = 0;
-							Cattack[Cattack_num].Angle = 90;
-							Cattack[Cattack_num].AngleRate = 0;
-						}
-					}
-					i--;
-				}
-				else if (Time < 960) {
-					static int i = 9;
-					for (int j = 19; j >= 0; j--) {
-						if (pattern[i][j] == '#') {
-							Cattack_num++;
-							if (Cattack_num >= 2000)
-								Cattack_num = 0;
-							Cattack[Cattack_num].Alive = TRUE;
-							Cattack[Cattack_num].X = 300 + j * 10;
-							Cattack[Cattack_num].Y = 100;
-							Cattack[Cattack_num].Speed = 10;
-							Cattack[Cattack_num].SpeedRate = 0;
-							Cattack[Cattack_num].Angle = 90;
-							Cattack[Cattack_num].AngleRate = 0;
-						}
-					}
-					i--;
-				}
-				else if (Time < 970) {}
-				else if (Time < 2000) {
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6;
-						Cattack[Cattack_num].AngleRate = 1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = -Time * 6;
-						Cattack[Cattack_num].AngleRate = -1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 90;
-						Cattack[Cattack_num].AngleRate = 1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = -Time * 6 - 90;
-						Cattack[Cattack_num].AngleRate = -1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 180;
-						Cattack[Cattack_num].AngleRate = 1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = -Time * 6 - 180;
-						Cattack[Cattack_num].AngleRate = -1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = Time * 6 - 270;
-						Cattack[Cattack_num].AngleRate = 1;
-						Cattack_num++;
-						if (Cattack_num >= 2000)
-							Cattack_num = 0;
-						Cattack[Cattack_num].Alive = TRUE;
-						Cattack[Cattack_num].X = yuyuko_x;
-						Cattack[Cattack_num].Y = yuyuko_y;
-						Cattack[Cattack_num].Speed = 10;
-						Cattack[Cattack_num].SpeedRate = 0;
-						Cattack[Cattack_num].Angle = -Time * 6 - 270;
-						Cattack[Cattack_num].AngleRate = -1;
-				}
-			}
-			//시간별탄막
-			break;
-		case 5:
-			imsiDondead = 0;
-			KillTimer(hWnd, 5);
-			break;
-		}
-		InvalidateRect(hWnd, NULL, false);
 		break;
 	case WM_LBUTTONUP:
 		shoot = 0;
@@ -1107,7 +509,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			Win.TransparentBlt(memDC, 0,200,600,400,
 			0,0,258,194,RGB(8,8,8));
 		}
-		else if (gameover == 1) {
+		else if (win == -1) {
 			GameOver.TransparentBlt(memDC, 0, 0, 600, 800,
 				0, 0, 544, 725,RGB(8,8,8));
 		}
@@ -1203,7 +605,7 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_TIMER:
 		switch (wParam) {
 		case 1:
-			if (win == 1 || gameover == 1) {}
+			if (win == 1 || win == -1) {}
 			else
 			score += 3;
 
