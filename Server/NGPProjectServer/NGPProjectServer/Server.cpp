@@ -868,7 +868,20 @@ void Update()
 		}
 	}
 
-	
+//정보 넘겨주기 위한 변수에 정리
+	for (int i = 0; i < MAX_PLAYER; i++)
+	{
+		for (int j = 0; j < PlayerBulletNum[i]; j++)
+		{
+			players[i].bullets[j].x = PlayersBullet[i][j].X;
+			players[i].bullets[j].y = PlayersBullet[i][j].Y;
+		}
+	}
+	for (int j = 0; j < EnemyBulletNum; j++) 
+	{
+		enemy.bullets[j].x = EnemyBullet[j].X;
+		enemy.bullets[j].y = EnemyBullet[j].Y;
+	}
 }
 
 void CollisionCheck()
