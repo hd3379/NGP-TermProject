@@ -12,6 +12,10 @@
 #define SERVERPORT 9000
 #define BUFSIZE    10000
 
+#define MAX_ENEMY_BULLET 200
+#define MAX_PLAYER_BULLET 50
+#define MAX_PLAYER 2
+
 // 오류 출력 함수
 void err_quit(char* msg);
 void err_display(char* msg);
@@ -39,7 +43,85 @@ enum class GAME_STATE
 	RUNNING,
 	END,
 };
+
+typedef struct Position
+{
+	float x, y;
+};
+
+typedef struct Player
+{
+	int number;
+	int hp;
+	bool is_click;
+	Position pos;
+	Position bullets[MAX_PLAYER_BULLET];
+};
+
+struct Enemy
+{
+	int hp;
+	Position pos;
+	Position bullets[MAX_ENEMY_BULLET];
+};
+
+template<class T>
+bool SendData(SOCKET sock, T* data, int len)
+{
+	int retval;
+
+	retval = send(sock, (char*)&len, sizeof(int), 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("고정 길이 send()");
+		return false;
+	}
+
+	retval = send(sock, (char*)&(*data), len, 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("가변 길이 send()");
+		return false;
+	}
+
+	return true;
+}
+
+template<class T>
+bool RecvData(SOCKET sock, T* data)
+{
+	int retval, len;
+
+	retval = recvn(sock, (char*)&len, sizeof(int), 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("고정 길이 recv()");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	retval = recvn(sock, (char*)&(*data), len, 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("가변 길이 recv()");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	return true;
+}
+
+void RecvID(SOCKET sock);
+void RecvGameState(SOCKET sock);
+void SendPlayerInfo(SOCKET sock);
+void RecvAllPlayerInfo(SOCKET sock);
+
+Enemy enemy;
+Player players[MAX_PLAYER];
 GAME_STATE curr_state;
+int myID;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	LPSTR lpszCmdParam, int nCmdShow)
@@ -205,19 +287,23 @@ DWORD WINAPI ClientMain(LPVOID arg)
 	serveraddr.sin_port = htons(SERVERPORT);
 	retval = connect(sock, (SOCKADDR*)&serveraddr, sizeof(serveraddr));
 	if (retval == SOCKET_ERROR) err_quit("connect()");
-	int len;
+
+	//네이글 알고리즘 중지
+	bool optval = TRUE;
+	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
 
 	// 서버와 데이터 통신
+	RecvID(sock);
 	while (1) {
-		//SendGameState();
+		RecvGameState(sock);
 		switch (curr_state)
 		{
 		case GAME_STATE::TITLE:
 			//RecvLogo();
 			break;
 		case GAME_STATE::RUNNING:
-			//SendPlayerInfo();
-			//RecvAllPlayerInfo();
+			SendPlayerInfo(sock);
+			RecvAllPlayerInfo(sock);
 			//RecvEnemyInfo();
 			break;
 		case GAME_STATE::END:
@@ -1356,4 +1442,48 @@ int recvn(SOCKET s, char* buf, int len, int flags)
 	}
 
 	return (len - left);
+}
+
+void RecvID(SOCKET sock)
+{
+	if (!RecvData(sock, &myID))
+		return;
+}
+
+void RecvGameState(SOCKET sock)
+{
+	if (!RecvData(sock, &curr_state))
+		return;
+}
+
+void SendPlayerInfo(SOCKET sock)
+{
+	if (!SendData(sock, &players[myID].number, sizeof(players[myID].number)))
+		return;
+
+	if (!SendData(sock, &players[myID].pos, sizeof(players[myID].pos)))
+		return;
+
+	if (!SendData(sock, &players[myID].is_click, sizeof(players[myID].is_click)))
+		return;
+}
+
+void RecvAllPlayerInfo(SOCKET sock)
+{
+	int number;
+
+	for (int i = 0; i < MAX_PLAYER; ++i)
+	{
+		if (!RecvData(sock, &number))
+			return;
+
+		if (!RecvData(sock, &players[number].hp))
+			return;
+
+		if (!RecvData(sock, &players[number].pos))
+			return;
+
+		if (!RecvData(sock, &players[number].bullets))
+			return;
+	}
 }

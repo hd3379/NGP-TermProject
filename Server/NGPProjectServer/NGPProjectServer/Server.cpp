@@ -90,6 +90,9 @@ void CBullet::Move(RECT rc) {
 	}
 }
 
+CRITICAL_SECTION cs;
+HANDLE client_thread, recv_event;
+
 Enemy enemy;
 Player players[MAX_PLAYER];
 GAME_STATE curr_state;
@@ -99,8 +102,60 @@ void error_display(const char* message);
 void error_quit(const char* message);
 int recvn(SOCKET socket, char* buffer, int length, int flags);
 
+template<class T>
+bool SendData(SOCKET sock, T* data, int len)
+{
+	int retval;
+
+	retval = send(sock, (char*)&len, sizeof(int), 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("고정 길이 send()");
+		return false;
+	}
+
+	retval = send(sock, (char*)&(*data), len, 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("가변 길이 send()");
+		return false;
+	}
+
+	return true;
+}
+
+template<class T>
+bool RecvData(SOCKET sock, T* data)
+{
+	int retval, len;
+
+	retval = recvn(sock, (char*)&len, sizeof(int), 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("고정 길이 recv()");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	retval = recvn(sock, (char*)&(*data), len, 0);
+	if (retval == SOCKET_ERROR)
+	{
+		error_display("가변 길이 recv()");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	return true;
+}
+
 void InitalizeGameData();
 void UpdateGameState();
+void SendID(SOCKET sock);
+void SendGameState(SOCKET sock);
+void RecvPlayerInfo(SOCKET sock);
+void SendAllPlayerInfo(SOCKET sock);
 
 unsigned WINAPI ProcessClient(LPVOID arg);
 
@@ -133,7 +188,11 @@ int main()
 	SOCKET client_socket;
 	SOCKADDR_IN client_address;
 	int client_address_length;
-	HANDLE thread;
+
+	InitializeCriticalSection(&cs);
+	recv_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+	if (recv_event == NULL)
+		return 1;
 
 	InitalizeGameData();
 
@@ -151,16 +210,17 @@ int main()
 		printf("[TCP 서버] 클라이언트가 접속했습니다.\n IP 주소 : %s, 포트 번호 : %d\n",
 			inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
 
-		thread = (HANDLE)_beginthreadex(NULL, 0, ProcessClient, (LPVOID)client_socket, 0, NULL);
-		if (thread == NULL)
+		client_thread = (HANDLE)_beginthreadex(NULL, 0, ProcessClient, (LPVOID)client_socket, 0, NULL);
+		if (client_thread == NULL)
 			closesocket(client_socket);
 		else
-			CloseHandle(thread);
+			CloseHandle(client_thread);
 	}
 
 	closesocket(listen_socket);
-
+	DeleteCriticalSection(&cs);
 	WSACleanup();
+
 	return 0;
 }
 
@@ -244,20 +304,24 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 	client_address_length = sizeof(client_address);
 	getpeername(client_socket, (SOCKADDR*)&client_address, &client_address_length);
 
+	SendID(client_socket);
 	while (true)
 	{
 		UpdateGameState();
-		//SendGameState();
+		SendGameState(client_socket);
 		switch (curr_state)
 		{
 		case GAME_STATE::TITLE:
 			//SendLogo();
 			break;
 		case GAME_STATE::RUNNING:
-			//RecvPlayerInfo();
+			RecvPlayerInfo(client_socket);
+
+			WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+
 			//Update();
 			//CollisionCheck();
-			//SendAllPlayerInfo();
+			SendAllPlayerInfo(client_socket);
 			//SendEnemyInfo();
 			break;
 		case GAME_STATE::END:
@@ -286,4 +350,56 @@ void UpdateGameState()
 	for (const auto& player : players)
 		if (player.hp < 0)
 			curr_state = GAME_STATE::END;
+}
+
+void SendID(SOCKET sock)
+{
+	if (!SendData(sock, &num_player, sizeof(num_player)))
+		return;
+
+	EnterCriticalSection(&cs);
+	num_player++;
+	LeaveCriticalSection(&cs);
+}
+
+void SendGameState(SOCKET sock)
+{
+	curr_state = GAME_STATE::RUNNING;
+
+	if (!SendData(sock, &curr_state, sizeof(curr_state)))
+		return;
+}
+
+void RecvPlayerInfo(SOCKET sock)
+{
+	int number;
+
+	if (!RecvData(sock, &number))
+		return;
+
+	if (!RecvData(sock, &players[number].pos))
+		return;
+
+	if (!RecvData(sock, &players[number].is_click))
+		return;
+
+	SetEvent(recv_event);
+}
+
+void SendAllPlayerInfo(SOCKET sock)
+{
+	for (int i = 0; i < MAX_PLAYER; ++i)
+	{
+		if (!SendData(sock, &players[i].number, sizeof(players[i].number)))
+			return;
+
+		if (!SendData(sock, &players[i].hp, sizeof(players[i].hp)))
+			return;
+
+		if (!SendData(sock, &players[i].pos, sizeof(players[i].pos)))
+			return;
+
+		if (!SendData(sock, &players[i].bullets, sizeof(players[i].bullets)))
+			return;
+	}
 }
