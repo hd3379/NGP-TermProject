@@ -1,4 +1,39 @@
 ﻿  Server.cpp
-C:\Users\user\source\repos\NGPProjectServer\NGPProjectServer\Server.cpp(25,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Position' 왼쪽은 무시됩니다.
-C:\Users\user\source\repos\NGPProjectServer\NGPProjectServer\Server.cpp(34,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Player' 왼쪽은 무시됩니다.
-  NGPProjectServer.vcxproj -> C:\Users\user\source\repos\NGPProjectServer\Debug\NGPProjectServer.exe
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(25,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Position' 왼쪽은 무시됩니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(34,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Player' 왼쪽은 무시됩니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(543,49): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(553,45): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(566,45): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(578,46): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(591,45): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(601,46): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(651,52): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(652,51): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(653,47): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(654,51): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(661,52): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(662,51): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(663,47): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(664,51): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(728,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(747,46): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(757,46): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(767,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(777,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(787,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(797,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(807,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(817,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(830,42): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(848,42): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(866,42): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(884,42): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(904,45): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(914,46): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(924,49): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(934,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(944,49): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(954,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(964,49): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\NGPProjectServer\Server.cpp(974,50): warning C4244: '=': 'int'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  NGPProjectServer.vcxproj -> C:\Users\ASUS\Desktop\NGP-TermProject\Server\NGPProjectServer\Debug\NGPProjectServer.exe

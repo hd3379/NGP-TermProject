@@ -66,12 +66,11 @@ public:
 		Alive = TRUE;
 	};
 
-	void Move
-	(RECT rc);
+	void Move();
 
 	~CBullet() {}
 };
-void CBullet::Move(RECT rc) {
+void CBullet::Move() {
 	float rad = Angle * 3.14f / 180.0f;
 
 	//각도와 속도를 사용해서 좌표갱신
@@ -85,7 +84,7 @@ void CBullet::Move(RECT rc) {
 	Speed += SpeedRate;
 
 	//화면밖에 나가면 탄삭제
-	if (X >= rc.right || X < 0 || Y >= rc.bottom || Y < 0) {
+	if (X >= 800 || X < 0 || Y >= 600 || Y < 0) {
 		Alive = false;
 	}
 }
@@ -296,16 +295,15 @@ void SendEnding(SOCKET socket)
 
 void InitalizeGameData()
 {
-	GAME_STATE curr_state = GAME_STATE::TITLE;
+	curr_state = GAME_STATE::TITLE;
 	int num_player = 0;
 
-	Enemy enemy;
 	enemy.hp = 200;
 	enemy.pos = { 100.0f, 105.f };
+
 	for (auto bullet : enemy.bullets)
 		bullet = { 10000.0f, -10000.0f };
 
-	Player players[MAX_PLAYER];
 	for (auto player : players)
 	{
 		player.number = -1;
@@ -439,14 +437,14 @@ void Update()
 			enemy.pos.x += EnemyXMove;
 		}
 	}
-	for (int i = 0; i < 2000; i++) {
+	for (int i = 0; i < EnemyBulletNum; i++) {
 		if (EnemyBullet[i].Alive == TRUE)
-			EnemyBullet[i].Move(rect);
+			EnemyBullet[i].Move();
 	}
 	for (int i = 0; i < MAX_PLAYER; i++) {
-		for (int j = 0; j < MAX_PLAYER_BULLET; i++) {
+		for (int j = 0; j < PlayerBulletNum[i]; i++) {
 			if (PlayersBullet[i][j].Alive == TRUE)
-				PlayersBullet[i][j].Move(rect);
+				PlayersBullet[i][j].Move();
 		}
 	}
 
@@ -998,7 +996,7 @@ void Update()
 void CollisionCheck()
 {
 	for (int i = 0; i < MAX_PLAYER; i++) {
-		for (int j = 0; j < MAX_PLAYER_BULLET; i++) {
+		for (int j = 0; j < PlayerBulletNum[i]; i++) {
 			if (PlayersBullet[i][j].Alive == TRUE) {
 				if (round_count == 1) {
 					if ((PlayersBullet[i][j].X > enemy.pos.x - 45) && (PlayersBullet[i][j].X < enemy.pos.x + 45) &&
@@ -1036,7 +1034,7 @@ void CollisionCheck()
 		}
 	}
 
-	for (int i = 0; i < 2000; i++) {
+	for (int i = 0; i < EnemyBulletNum; i++) {
 		if (EnemyBullet[i].Alive == TRUE) {
 			for (int j = 0; j < MAX_PLAYER; j++) {
 				if (sqrt(pow(players[j].pos.x - EnemyBullet[i].X, 2) + pow(players[j].pos.y - EnemyBullet[i].Y, 2)) < 26) {

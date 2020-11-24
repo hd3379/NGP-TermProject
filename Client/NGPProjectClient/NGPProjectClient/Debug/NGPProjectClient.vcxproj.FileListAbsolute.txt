@@ -1,2 +1,4 @@
 C:\Users\ASUS\Desktop\NGPProjectClient\NGPProjectClient\Debug\NGPProjectClient.exe
 C:\Users\ASUS\Desktop\NGPProjectClient\NGPProjectClient\Debug\NGPProjectClient.pdb
+C:\Users\ASUS\Desktop\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\Debug\NGPProjectClient.exe
+C:\Users\ASUS\Desktop\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\Debug\NGPProjectClient.pdb

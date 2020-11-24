@@ -73,14 +73,14 @@ bool SendData(SOCKET sock, T* data, int len)
 	retval = send(sock, (char*)&len, sizeof(int), 0);
 	if (retval == SOCKET_ERROR)
 	{
-		error_display("고정 길이 send()");
+		err_display("고정 길이 send()");
 		return false;
 	}
 
 	retval = send(sock, (char*)&(*data), len, 0);
 	if (retval == SOCKET_ERROR)
 	{
-		error_display("가변 길이 send()");
+		err_display("가변 길이 send()");
 		return false;
 	}
 
@@ -95,7 +95,7 @@ bool RecvData(SOCKET sock, T* data)
 	retval = recvn(sock, (char*)&len, sizeof(int), 0);
 	if (retval == SOCKET_ERROR)
 	{
-		error_display("고정 길이 recv()");
+		err_display("고정 길이 recv()");
 		return false;
 	}
 	else if (retval == 0)
@@ -104,7 +104,7 @@ bool RecvData(SOCKET sock, T* data)
 	retval = recvn(sock, (char*)&(*data), len, 0);
 	if (retval == SOCKET_ERROR)
 	{
-		error_display("가변 길이 recv()");
+		err_display("가변 길이 recv()");
 		return false;
 	}
 	else if (retval == 0)
@@ -745,7 +745,7 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		///////// score
 
 		SetBkMode(memDC, TRANSPARENT);
-
+		 
 		hFont = CreateFont(30, 0, 0, 0, 1000, 0, 0, 0, HANGEUL_CHARSET, 0, 0, 0,
 			VARIABLE_PITCH | FF_ROMAN, TEXT("굴림"));
 		oldFont = (HFONT)SelectObject(memDC, hFont);
