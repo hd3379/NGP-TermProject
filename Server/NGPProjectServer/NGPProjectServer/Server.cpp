@@ -5,12 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <process.h>
+#include <time.h>
 
 #define SERVER_PORT 9000
 
 #define MAX_ENEMY_BULLET 200
 #define MAX_PLAYER_BULLET 50
-#define MAX_PLAYER 2
+#define MAX_PLAYER 1
 
 enum class GAME_STATE
 {
@@ -33,7 +34,7 @@ typedef struct Player
 	Position bullets[MAX_PLAYER_BULLET];
 };
 
-struct Enemy
+typedef struct Enemy
 {
 	int hp;
 	Position pos;
@@ -102,7 +103,7 @@ int round_count;
 int PlayerBulletNum[MAX_PLAYER];
 int EnemyBulletNum;
 RECT rect;
-int win;
+int win = 0;
 bool Dondead;
 int imsiDondead;
 int EnemyXMove;
@@ -162,10 +163,11 @@ bool RecvData(SOCKET sock, T* data)
 
 void InitalizeGameData();
 void UpdateGameState();
-void SendID(SOCKET sock);
+void SendPlayerNumber(SOCKET sock);
 void SendGameState(SOCKET sock);
 void RecvPlayerInfo(SOCKET sock);
 void SendAllPlayerInfo(SOCKET sock);
+void SendEnemyInfo(SOCKET sock);
 void CollisionCheck();
 void SendEnding(SOCKET socket);
 void Update();
@@ -203,6 +205,7 @@ int main()
 	int client_address_length;
 
 	InitializeCriticalSection(&cs);
+	
 	recv_event = CreateEventA(NULL, FALSE, FALSE, NULL);
 	if (recv_event == NULL)
 		return 1;
@@ -282,6 +285,7 @@ int recvn(SOCKET socket, char* buffer, int length, int flags)
 
 	return (length - left);
 }
+
 void SendLogo(SOCKET socket)
 {
 	send(socket, (char*)num_player, sizeof(int), 0);
@@ -292,11 +296,10 @@ void SendEnding(SOCKET socket)
 	send(socket, (char*)win, sizeof(int), 0); // win이 1이면 승, -1이면 게임오버
 }
 
-
 void InitalizeGameData()
 {
 	curr_state = GAME_STATE::TITLE;
-	int num_player = 0;
+	num_player = 0;
 
 	enemy.hp = 200;
 	enemy.pos = { 100.0f, 105.f };
@@ -326,36 +329,64 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 	client_address_length = sizeof(client_address);
 	getpeername(client_socket, (SOCKADDR*)&client_address, &client_address_length);
 
-	SendID(client_socket);
-	while (true)
+	SendPlayerNumber(client_socket);
+
+	clock_t start = clock();
+
+	while (true) 
 	{
-		UpdateGameState();
-		SendGameState(client_socket);
-		switch (curr_state)
+		clock_t end = clock();
+		//디버그용 출력문
+		if ((end - start) / CLOCKS_PER_SEC >= 2)
 		{
-		case GAME_STATE::TITLE:
-			SendLogo(client_socket);
-			break;
-		case GAME_STATE::RUNNING:
-			RecvPlayerInfo(client_socket);
+			start = clock();
 
-			WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+			switch (curr_state)
+			{
+			case GAME_STATE::TITLE:
+				printf("TITLE\n");
+				break;
+			case GAME_STATE::RUNNING:
+				printf("RUNNING\n");
+				break;
+			case GAME_STATE::END:
+				printf("END\n");
+				break;
+			default:
+				printf("DEFAULT\n");
+				break;
+			}
 
-			Update();
-			CollisionCheck();
-			SendAllPlayerInfo(client_socket);
-			//SendEnemyInfo();
-			break;
-		case GAME_STATE::END:
-			SendEnding(client_socket);
-			break;
-		default:
-			break;
+			for (int i = 0; i < num_player; ++i)
+			{
+				printf("num_player: %d - ", num_player);
+				printf("%dP pos {%.2f, %.2f}, click %d\n", i+1, players[i].pos.x, players[i].pos.y, players[i].is_click);
+			}
 		}
+			UpdateGameState();
+			SendGameState(client_socket);
+			switch (curr_state)
+			{
+			case GAME_STATE::TITLE:
+				SendLogo(client_socket);
+				break;
+			case GAME_STATE::RUNNING:
+				RecvPlayerInfo(client_socket);
 
-		printf("\n[TCP 서버] 클라이언트 종료. IP 주소 - %s, 포트 번호 - %d\n",
-			inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
-		break;
+				//WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+
+				Update();
+				CollisionCheck();
+				SendAllPlayerInfo(client_socket);
+				SendEnemyInfo(client_socket);
+				break;
+			case GAME_STATE::END:
+				SendEnding(client_socket);
+				break;
+			default:
+				break;
+			
+		}
 	}
 
 	return 0;
@@ -363,7 +394,7 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 
 void UpdateGameState()
 {
-	if (num_player == 2)
+	if (num_player == MAX_PLAYER)
 		curr_state = GAME_STATE::RUNNING;
 
 	if (enemy.hp <= 0)
@@ -374,7 +405,7 @@ void UpdateGameState()
 			curr_state = GAME_STATE::END;
 }
 
-void SendID(SOCKET sock)
+void SendPlayerNumber(SOCKET sock)
 {
 	if (!SendData(sock, &num_player, sizeof(num_player)))
 		return;
@@ -426,6 +457,15 @@ void SendAllPlayerInfo(SOCKET sock)
 	}
 }
 
+void SendEnemyInfo(SOCKET sock)
+{
+	if (!SendData(sock, &enemy.pos, sizeof(enemy.pos)))
+		return;
+
+	if (!SendData(sock, &enemy.bullets, sizeof(enemy.bullets)))
+		return;
+}
+
 void Update()
 {
 
@@ -449,7 +489,7 @@ void Update()
 	}
 
 	for (int i = 0; i < MAX_PLAYER; i++) {
-		if (players[i].is_click == 1) {
+		if (players[i].is_click) {
 			PlayerBulletNum[i]++;
 			if (PlayerBulletNum[i] >= 20)
 				PlayerBulletNum[i] = 0;
@@ -991,7 +1031,6 @@ void Update()
 		enemy.bullets[j].y = EnemyBullet[j].Y;
 	}
 }
-
 
 void CollisionCheck()
 {

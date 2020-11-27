@@ -1,4 +1,6 @@
 #pragma comment(lib, "ws2_32")
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 #include <winsock2.h>
 #include <stdlib.h>
 #include<windows.h>
@@ -7,26 +9,20 @@
 #include <mmsystem.h>
 #include "resource.h"
 
-
 #define SERVERIP   "127.0.0.1"
 #define SERVERPORT 9000
-#define BUFSIZE    10000
 
 #define MAX_ENEMY_BULLET 200
 #define MAX_PLAYER_BULLET 50
-#define MAX_PLAYER 2
+#define MAX_PLAYER 1
 
 // 오류 출력 함수
 void err_quit(char* msg);
 void err_display(char* msg);
 // 사용자 정의 데이터 수신 함수
 int recvn(SOCKET s, char* buf, int len, int flags);
-// 소켓 통신 스레드 함수
-DWORD WINAPI ClientMain(LPVOID arg);
 
 SOCKET sock; // 소켓
-char buf[BUFSIZE + 1]; // 데이터 송수신 버퍼
-HANDLE hReadEvent, hWriteEvent; // 이벤트
 
 HINSTANCE g_hInst;
 LPCTSTR lpszClass = TEXT("Window Class Name");
@@ -58,7 +54,7 @@ typedef struct Player
 	Position bullets[MAX_PLAYER_BULLET];
 };
 
-struct Enemy
+typedef struct Enemy
 {
 	int hp;
 	Position pos;
@@ -113,17 +109,20 @@ bool RecvData(SOCKET sock, T* data)
 	return true;
 }
 
-void RecvID(SOCKET sock);
+void RecvPlayerNumber(SOCKET sock);
 void RecvGameState(SOCKET sock);
 void SendPlayerInfo(SOCKET sock);
 void RecvAllPlayerInfo(SOCKET sock);
+void RecvEnemyInfo(SOCKET sock);
 void RecvLogo(SOCKET socket);
 void RecvEnding(SOCKET socket);
+bool IsAlive(Position bullet);
+float Clamp(float min, float value, float max);
 
 Enemy enemy;
 Player players[MAX_PLAYER];
 GAME_STATE curr_state;
-int myID;
+int my_number;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	LPSTR lpszCmdParam, int nCmdShow)
@@ -157,15 +156,31 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	WndClass.lpfnWndProc = ChildProc2;
 	RegisterClassEx(&WndClass);
 
-	// 이벤트 생성
-	hReadEvent = CreateEvent(NULL, FALSE, TRUE, NULL);
-	if (hReadEvent == NULL) return 1;
-	hWriteEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-	if (hWriteEvent == NULL) return 1;
+	int retval;
 
-	// 소켓 통신 스레드 생성
-	CreateThread(NULL, 0, ClientMain, NULL, 0, NULL);
+	// 윈속 초기화
+	WSADATA wsa;
+	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+		return 1;
 
+	// socket()
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock == INVALID_SOCKET) err_quit("socket()");
+
+	// connect()
+	SOCKADDR_IN serveraddr;
+	ZeroMemory(&serveraddr, sizeof(serveraddr));
+	serveraddr.sin_family = AF_INET;
+	serveraddr.sin_addr.s_addr = inet_addr(SERVERIP);
+	serveraddr.sin_port = htons(SERVERPORT);
+	retval = connect(sock, (SOCKADDR*)&serveraddr, sizeof(serveraddr));
+	if (retval == SOCKET_ERROR) err_quit("connect()");
+
+	//네이글 알고리즘 중지
+	bool optval = TRUE;
+	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
+
+	RecvPlayerNumber(sock);
 
 	hWnd = CreateWindow(lpszClass,
 		TEXT("window program"),
@@ -179,67 +194,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		TranslateMessage(&Message);
 		DispatchMessage(&Message);
 	}
-
-	// 이벤트 제거
-	CloseHandle(hReadEvent);
-	CloseHandle(hWriteEvent);
-
-	// closesocket()
+	
 	closesocket(sock);
-
 	// 윈속 종료
 	WSACleanup();
 
 	return Message.wParam;
-}
-
-class CBullet {
-public:
-	//각속도
-	float AngleRate;
-	//속도
-	float Speed;
-	//가속도
-	float SpeedRate;
-
-	float X, Y;
-	float Angle;
-	bool Alive;
-
-	int ID;
-
-	CBullet() {
-		Alive = false;
-	}
-	/*CBullet(float x, float y, float angle, float angle_rate, float speed, float speed_rate) {
-		X = x; Y = y;	AngleRate = angle_rate;
-		Angle = angle;	Speed = speed;
-		SpeedRate = speed_rate;
-		Alive = TRUE;
-	};*/
-
-	void Move
-	(RECT rc);
-
-	~CBullet(){}
-};
-void CBullet::Move(RECT rc) {
-	float rad = Angle*3.14 / 180.0;
-
-	//각도와 속도를 사용해서 좌표갱신
-	X += Speed*cosf(rad);
-	Y += Speed*sinf(rad);
-
-	//각도에 각속도 가산
-	Angle += AngleRate;
-
-	//속도에 가속도 가산
-	Speed += SpeedRate;
-
-	//화면밖에 나가면 탄삭제
-	if ( X >= rc.right || X< 0 || Y >=rc.bottom || Y < 0 ) {
-		Alive = false;
-	}
 }
 
 CImage background;
@@ -268,57 +228,6 @@ HBITMAP TITLE;
 
 int win;
 int num_player;
-
-// TCP 클라이언트 시작 부분
-DWORD WINAPI ClientMain(LPVOID arg)
-{
-	int retval;
-
-	// 윈속 초기화
-	WSADATA wsa;
-	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-		return 1;
-
-	// socket()
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock == INVALID_SOCKET) err_quit("socket()");
-
-	// connect()
-	SOCKADDR_IN serveraddr;
-	ZeroMemory(&serveraddr, sizeof(serveraddr));
-	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_addr.s_addr = inet_addr(SERVERIP);
-	serveraddr.sin_port = htons(SERVERPORT);
-	retval = connect(sock, (SOCKADDR*)&serveraddr, sizeof(serveraddr));
-	if (retval == SOCKET_ERROR) err_quit("connect()");
-
-	//네이글 알고리즘 중지
-	bool optval = TRUE;
-	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
-
-	// 서버와 데이터 통신
-	RecvID(sock);
-	while (1) {
-		RecvGameState(sock);
-		switch (curr_state)
-		{
-		case GAME_STATE::TITLE:
-			RecvLogo(sock);
-			break;
-		case GAME_STATE::RUNNING:
-			SendPlayerInfo(sock);
-			RecvAllPlayerInfo(sock);
-			//RecvEnemyInfo();
-			break;
-		case GAME_STATE::END:
-			RecvEnding(sock);
-			break;
-		default:
-			break;
-		}
-	}
-	return 0;
-}
 
 void LOGO(HDC hdc,RECT rc) {
 	HDC memdc;
@@ -422,6 +331,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	static RECT rc;
 	static bool start;
 
+	RecvGameState(sock);
+	switch (curr_state)
+	{
+	case GAME_STATE::TITLE:
+		RecvLogo(sock);
+		break;
+	case GAME_STATE::RUNNING:
+		SendPlayerInfo(sock);
+		RecvAllPlayerInfo(sock);
+		RecvEnemyInfo(sock);
+		break;
+	case GAME_STATE::END:
+		RecvEnding(sock);
+		break;
+	default:
+		break;
+	}
+
 	switch (iMessage) {
 	case WM_CREATE:
 		GetClientRect(hWnd, &rc);
@@ -460,8 +387,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		memdc = CreateCompatibleDC(hdc);
 		memBoard = CreateCompatibleBitmap(hdc, rc.right, rc.bottom);
 		SelectObject(memdc, memBoard);
-
-
 
 		if (start == 0) {
 			LOGO(memdc, rc);
@@ -519,6 +444,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 
 HFONT hFont, oldFont;
+Position mouse;
 static int score = 0;
 static int round_count = 1;
 static int life_point = 3;
@@ -529,18 +455,11 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	HDC hdc, memDC;
 	PAINTSTRUCT ps;
 	static RECT rect;
-	static int reimu_x, reimu_y;
 	static int cirno_x, cirno_y,cirno_xplus,cirno_hp;
 	static int yuyuko_x, yuyuko_y, yuyuko_hp;
-	static int mouse_x, mouse_y;
 	static int Time;
 	
 	static bool butterfly;
-	static bool shoot;
-	static CBullet Rattack[20];
-	static CBullet Cattack[2001];
-	static int Cattack_num;
-	static int Rattack_num;
 	static char pattern[10][20] = {
 		"         #         ",
 		"   ###  # #  ###   ",
@@ -560,10 +479,10 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		GetClientRect(hWnd, &rect);
 		break;
 	case WM_LBUTTONDOWN:
-		shoot = 1;
+		players[my_number].is_click = true;
 		break;
 	case WM_LBUTTONUP:
-		shoot = 0;
+		players[my_number].is_click = false;
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
@@ -582,46 +501,56 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			GameOver.TransparentBlt(memDC, 0, 0, 600, 800,
 				0, 0, 544, 725,RGB(8,8,8));
 		}
-		else if (round_count == 1) {
+		else if (round_count == 1)
+		{
 			cirno_back.TransparentBlt(memDC, 0, 0, 600, 800,
 				0, 0, 600, 442, RGB(255, 255, 255));
-			cirno.TransparentBlt(memDC, cirno_x - 30, cirno_y - 50, 60, 100,
+			cirno.TransparentBlt(memDC, enemy.pos.x - 30, enemy.pos.y - 50, 60, 100,
 				0, 0, 300, 500, RGB(255, 0, 0, ));
-			for (int i = 0; i < 2000; i++) {
-				if (Cattack[i].Alive == TRUE) {
-					skill1.TransparentBlt(memDC, Cattack[i].X - 10, Cattack[i].Y - 10, 20, 20, 0, 0, 40, 40, RGB(250, 250, 250));
+			for (int i = 0; i < MAX_ENEMY_BULLET; i++) 
+			{
+				if (IsAlive(enemy.bullets[i])) {
+					skill1.TransparentBlt(memDC, enemy.bullets[i].x - 10, enemy.bullets[i].y - 10,
+						20, 20, 0, 0, 40, 40, RGB(250, 250, 250));
 				}
 			}
 		}
-		else {
+		else
+		{
 			flower.TransparentBlt(memDC, 0, 0, 600, 800,
 				0, 0, 600, 644, RGB(255, 255, 255));
-			yuyuko.TransparentBlt(memDC, yuyuko_x - 30, yuyuko_y - 50, 60, 100,
+			yuyuko.TransparentBlt(memDC, enemy.pos.x - 30, enemy.pos.y - 50, 60, 100,
 				0 , 0 ,99,143,RGB(47,95,115));
-			for (int i = 0; i < 2000; i++) {
-				if (Cattack[i].Alive == TRUE) {
+			for (int i = 0; i < MAX_ENEMY_BULLET; i++) 
+			{
+				if (IsAlive(enemy.bullets[i])) {
 					if (butterfly == 0)
-						skill2.TransparentBlt(memDC, Cattack[i].X - 10, Cattack[i].Y - 10, 20, 20, 0, 0, 40, 40, RGB(250, 250, 250));
+						skill2.TransparentBlt(memDC, enemy.bullets[i].x - 10, enemy.bullets[i].y - 10, 
+							20, 20, 0, 0, 40, 40, RGB(250, 250, 250));
 					else
-						Nabi.TransparentBlt(memDC, Cattack[i].X - 20, Cattack[i].Y - 20, 40, 40, 0, 0, 169, 172, RGB(0, 0, 0));
+						Nabi.TransparentBlt(memDC, enemy.bullets[i].x - 20, enemy.bullets[i].y - 20,
+							40, 40, 0, 0, 169, 172, RGB(0, 0, 0));
 				}
 			}
 		}
 
+		for (int i = 0; i < num_player; ++i)
+		{
+			reimu.TransparentBlt(memDC, players[i].pos.x - 19, players[i].pos.y - 35, 41, 85,
+				0, 0, 100, 216, RGB(255, 255, 255));
 
-		reimu.TransparentBlt(memDC, reimu_x - 19, reimu_y - 35, 41, 85,
-			0, 0, 100, 216, RGB(255, 255, 255));
+			core.TransparentBlt(memDC, players[i].pos.x - 8, players[i].pos.y - 8, 16, 16,
+				0, 0, 320, 320, RGB(255, 255, 255));
 
-		core.TransparentBlt(memDC, reimu_x - 8, reimu_y -8, 16, 16,
-			0, 0, 320, 320, RGB(255, 255, 255));
-
-		//레이무탄
-		for (int i = 0; i < 20; i++) {
-			if (Rattack[i].Alive == TRUE) {
-				Bujuck.TransparentBlt(memDC, Rattack[i].X-7, Rattack[i].Y-10, 15, 20, 0, 0, 228, 490, RGB(255, 255, 255));
+			for (int j = 0; j < MAX_PLAYER_BULLET; j++)
+			{
+				if (IsAlive(players[i].bullets[j]))
+				{
+					Bujuck.TransparentBlt(memDC, players[i].bullets[j].x - 7, players[i].bullets[j].y - 10,
+						15, 20, 0, 0, 228, 490, RGB(255, 255, 255));
+				}
 			}
 		}
-		//레이무탄
 
 		BackBuff.Draw(hdc, 0, 0);
 		BackBuff.ReleaseDC();
@@ -631,14 +560,17 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		break;
 
 	case WM_MOUSEMOVE:
-		mouse_x = LOWORD(lParam);
-		mouse_y = HIWORD(lParam);
+		mouse.x = LOWORD(lParam);
+		mouse.y = HIWORD(lParam);
 
-		if (mouse_x <= 590 && mouse_x >= 10)
-			reimu_x = mouse_x;
+		mouse.x = Clamp(10.0f, mouse.x, 590.0f);
+		mouse.y = Clamp(10.0f, mouse.y, 790.0f);
 
-		if (mouse_y <= 790 && mouse_y >= 10)
-			reimu_y = mouse_y;
+		players[my_number].pos.x = LOWORD(lParam);
+		players[my_number].pos.y = HIWORD(lParam);
+		
+		players[my_number].pos.x = Clamp(10.0f, players[my_number].pos.x, 590.0f);
+		players[my_number].pos.y = Clamp(10.0f, players[my_number].pos.y, 790.0f);
 
 		break;
 	case WM_DESTROY:
@@ -686,8 +618,6 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		FillRect(memDC, &rect, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
 
-
-
 		if (round_count == 1) {
 			SetTextColor(memDC, RGB(100, 100, 250));
 			cirno_back.TransparentBlt(memDC, 0, 0, 250, 800,
@@ -714,11 +644,10 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		TextOut(memDC, 20, 200, TEXT("Life"), 5);
 
-		for (int a = 0; a < life_point; a++) {
+		for (int a = 0; a < players[my_number].hp; a++) {
 			life.TransparentBlt(memDC, 100 + (40 * a), 195, 33, 40,
 				0, 0, 33, 40, RGB(250, 250, 250));
 		}
-
 
 		TextOut(memDC, 20, 250, TEXT("skill1"), 7);
 
@@ -823,9 +752,9 @@ int recvn(SOCKET s, char* buf, int len, int flags)
 	return (len - left);
 }
 
-void RecvID(SOCKET sock)
+void RecvPlayerNumber(SOCKET sock)
 {
-	if (!RecvData(sock, &myID))
+	if (!RecvData(sock, &my_number))
 		return;
 }
 
@@ -837,13 +766,13 @@ void RecvGameState(SOCKET sock)
 
 void SendPlayerInfo(SOCKET sock)
 {
-	if (!SendData(sock, &players[myID].number, sizeof(players[myID].number)))
+	if (!SendData(sock, &players[my_number].number, sizeof(players[my_number].number)))
 		return;
 
-	if (!SendData(sock, &players[myID].pos, sizeof(players[myID].pos)))
+	if (!SendData(sock, &players[my_number].pos, sizeof(players[my_number].pos)))
 		return;
 
-	if (!SendData(sock, &players[myID].is_click, sizeof(players[myID].is_click)))
+	if (!SendData(sock, &players[my_number].is_click, sizeof(players[my_number].is_click)))
 		return;
 }
 
@@ -875,4 +804,32 @@ void RecvLogo(SOCKET socket)
 void RecvEnding(SOCKET socket)
 {
 	recvn(socket, (char*)win, sizeof(int), 0);
+}
+
+void RecvEnemyInfo(SOCKET sock)
+{
+	if (!RecvData(sock, &enemy.pos))
+		return;
+
+	if (!RecvData(sock, &enemy.bullets))
+		return;
+}
+
+bool IsAlive(Position bullet)
+{
+	if ((-5000.0f < bullet.x && bullet.x < 5000.0f) && (-5000.0f < bullet.y && bullet.y < 5000.0f))
+		return true;
+	else
+		return false;
+}
+
+float Clamp(float min, float value, float max)
+{
+	if (value < min)
+		return min;
+
+	if (value > max)
+		return max;
+
+	return value;
 }
