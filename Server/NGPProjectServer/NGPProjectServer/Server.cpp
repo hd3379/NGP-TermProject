@@ -169,8 +169,9 @@ void RecvPlayerInfo(SOCKET sock);
 void SendAllPlayerInfo(SOCKET sock);
 void SendEnemyInfo(SOCKET sock);
 void CollisionCheck();
-void SendEnding(SOCKET socket);
 void Update();
+void SendLogo(SOCKET socket);
+void SendEnding(SOCKET socket);
 
 unsigned WINAPI ProcessClient(LPVOID arg);
 
@@ -286,16 +287,6 @@ int recvn(SOCKET socket, char* buffer, int length, int flags)
 	return (length - left);
 }
 
-void SendLogo(SOCKET socket)
-{
-	send(socket, (char*)num_player, sizeof(int), 0);
-}
-
-void SendEnding(SOCKET socket)
-{
-	send(socket, (char*)win, sizeof(int), 0); // win이 1이면 승, -1이면 게임오버
-}
-
 void InitalizeGameData()
 {
 	curr_state = GAME_STATE::TITLE;
@@ -362,31 +353,35 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 				printf("num_player: %d - ", num_player);
 				printf("%dP pos {%.2f, %.2f}, click %d\n", i+1, players[i].pos.x, players[i].pos.y, players[i].is_click);
 			}
+
+			printf("enemy pos {%.2f, %.2f}\n", enemy.pos.x, enemy.pos.y);
+
 		}
-			UpdateGameState();
-			SendGameState(client_socket);
-			switch (curr_state)
-			{
-			case GAME_STATE::TITLE:
-				SendLogo(client_socket);
-				break;
-			case GAME_STATE::RUNNING:
-				RecvPlayerInfo(client_socket);
 
-				//WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+		SendGameState(client_socket);
+		switch (curr_state)
+		{
+		case GAME_STATE::TITLE:
+			SendLogo(client_socket);
+			break;
+		case GAME_STATE::RUNNING:
+			RecvPlayerInfo(client_socket);
 
-				Update();
-				CollisionCheck();
-				SendAllPlayerInfo(client_socket);
-				SendEnemyInfo(client_socket);
-				break;
-			case GAME_STATE::END:
-				SendEnding(client_socket);
-				break;
-			default:
-				break;
+			//WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+
+			Update();
+			CollisionCheck();
+			SendAllPlayerInfo(client_socket);
+			SendEnemyInfo(client_socket);
+			break;
+		case GAME_STATE::END:
+			SendEnding(client_socket);
+			break;
+		default:
+			break;
 			
 		}
+		UpdateGameState();
 	}
 
 	return 0;
@@ -463,6 +458,19 @@ void SendEnemyInfo(SOCKET sock)
 		return;
 
 	if (!SendData(sock, &enemy.bullets, sizeof(enemy.bullets)))
+		return;
+}
+
+void SendLogo(SOCKET socket)
+{
+	if (!SendData(socket, &num_player, sizeof(num_player)))
+		return;
+}
+
+void SendEnding(SOCKET socket)
+{
+	// win이 1이면 승, -1이면 게임오버
+	if (!SendData(socket, &win, sizeof(win)))
 		return;
 }
 

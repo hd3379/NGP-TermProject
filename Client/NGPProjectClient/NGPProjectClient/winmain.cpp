@@ -417,7 +417,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 			// score
 			child_hWnd2 = CreateWindow(TEXT("Child2"), NULL, WS_CHILD | WS_VISIBLE, 700, 30, 250, 800, hWnd, NULL, g_hInst, NULL);
 
-
 			InvalidateRect(hWnd, NULL, TRUE);
 		}
 		else if (wParam == 'z' || wParam == 'Z') {
@@ -441,10 +440,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	return(DefWindowProc(hWnd, iMessage, wParam, lParam));
 }
 
-
-
 HFONT hFont, oldFont;
-Position mouse;
 static int score = 0;
 static int round_count = 1;
 static int life_point = 3;
@@ -477,12 +473,17 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_CREATE:
 		GetClientRect(hWnd, &rect);
+		SetTimer(hWnd, 2, 70, NULL);
 		break;
 	case WM_LBUTTONDOWN:
 		players[my_number].is_click = true;
 		break;
 	case WM_LBUTTONUP:
 		players[my_number].is_click = false;
+		break;
+	case WM_TIMER:
+		InvalidateRect(hWnd, NULL, FALSE);
+
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
@@ -534,12 +535,12 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 		}
 
-		for (int i = 0; i < num_player; ++i)
+		for (int i = 0; i < MAX_PLAYER; ++i)
 		{
-			reimu.TransparentBlt(memDC, players[i].pos.x - 19, players[i].pos.y - 35, 41, 85,
+			reimu.TransparentBlt(memDC, (int)players[i].pos.x - 19, (int)players[i].pos.y - 35, 41, 85,
 				0, 0, 100, 216, RGB(255, 255, 255));
 
-			core.TransparentBlt(memDC, players[i].pos.x - 8, players[i].pos.y - 8, 16, 16,
+			core.TransparentBlt(memDC, (int)players[i].pos.x - 8, (int)players[i].pos.y - 8, 16, 16,
 				0, 0, 320, 320, RGB(255, 255, 255));
 
 			for (int j = 0; j < MAX_PLAYER_BULLET; j++)
@@ -560,12 +561,6 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		break;
 
 	case WM_MOUSEMOVE:
-		mouse.x = LOWORD(lParam);
-		mouse.y = HIWORD(lParam);
-
-		mouse.x = Clamp(10.0f, mouse.x, 590.0f);
-		mouse.y = Clamp(10.0f, mouse.y, 790.0f);
-
 		players[my_number].pos.x = LOWORD(lParam);
 		players[my_number].pos.y = HIWORD(lParam);
 		
@@ -587,6 +582,7 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	PAINTSTRUCT ps;
 	static RECT rect;
 	TCHAR str[10];
+	TCHAR debugstringA[40], debugstringB[40], debugstringC[40];
 
 	switch (uMsg) {
 
@@ -649,33 +645,14 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				0, 0, 33, 40, RGB(250, 250, 250));
 		}
 
-		TextOut(memDC, 20, 250, TEXT("skill1"), 7);
-
-		for (int a = 0; a < skill_1_point; a++) {
-			skill1.TransparentBlt(memDC, 100 + (40 * a), 245, 40, 40,
-				0, 0, 40, 40, RGB(250, 250, 250));
-		}
-
-
-		TextOut(memDC, 20, 300, TEXT("skill2"), 7);
-
-		for (int a = 0; a < skill_2_point; a++) {
-			skill2.TransparentBlt(memDC, 100 + (40 * a), 295, 41, 40,
-				0, 0, 41, 40, RGB(250, 250, 250));
-		}
-
 		SelectObject(memDC, oldFont);
 		DeleteObject(hFont);
-
-
-		////////
-
 
 		///////// score
 
 		SetBkMode(memDC, TRANSPARENT);
 		 
-		hFont = CreateFont(30, 0, 0, 0, 1000, 0, 0, 0, HANGEUL_CHARSET, 0, 0, 0,
+		hFont = CreateFont(20, 0, 0, 0, 1000, 0, 0, 0, HANGEUL_CHARSET, 0, 0, 0,
 			VARIABLE_PITCH | FF_ROMAN, TEXT("±¼¸²"));
 		oldFont = (HFONT)SelectObject(memDC, hFont);
 
@@ -683,6 +660,22 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		wsprintf(str, TEXT("%d"), score);
 		TextOut(memDC, 150, 100, str, lstrlen(str));
+
+		for (int i = 0; i < MAX_PLAYER; ++i)
+		{
+			_stprintf(debugstringA, TEXT("nump %d mynum %d"), num_player, my_number);
+			TextOut(memDC, 10, 300 + i*20, debugstringA, lstrlen(debugstringA));
+
+			_stprintf(debugstringB, TEXT("%dP {%d, %d} c %d"), 
+				i + 1, (int)players[i].pos.x, (int)players[i].pos.y, players[i].is_click);
+			TextOut(memDC, 10, 360 + i*20, debugstringB, lstrlen(debugstringB));
+
+			printf("%dP pos {%.1f, %.1f} c %d\n",
+				i + 1, players[i].pos.x, players[i].pos.y, players[i].is_click);
+		}
+
+		_stprintf(debugstringC, TEXT("e pos {%d, %d}"), (int)enemy.pos.x, (int)enemy.pos.y);
+		TextOut(memDC, 10, 400, debugstringC, lstrlen(debugstringC));
 
 		SelectObject(memDC, oldFont);
 		DeleteObject(hFont);
@@ -699,7 +692,6 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
-
 
 	}
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -798,12 +790,14 @@ void RecvAllPlayerInfo(SOCKET sock)
 
 void RecvLogo(SOCKET socket)
 {
-	recvn(socket, (char*)num_player, sizeof(int), 0);
+	if (!RecvData(sock, &num_player))
+		return;
 }
 
 void RecvEnding(SOCKET socket)
 {
-	recvn(socket, (char*)win, sizeof(int), 0);
+	if (!RecvData(sock, &win))
+		return;
 }
 
 void RecvEnemyInfo(SOCKET sock)

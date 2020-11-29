@@ -2,21 +2,17 @@
 C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(46,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Position' 왼쪽은 무시됩니다.
 C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(55,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Player' 왼쪽은 무시됩니다.
 C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(62,2): warning C4091: 'typedef ': 변수를 선언하지 않으면 'Enemy' 왼쪽은 무시됩니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(509,21): warning C4002: 함수 같은 매크로 호출 'RGB'에 대해 인수가 너무 많습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(508,62): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(508,44): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(513,79): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(513,54): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(522,63): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(522,45): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(528,80): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(528,55): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(531,78): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(531,53): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(539,72): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(539,49): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(542,70): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(542,48): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(549,88): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(549,59): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(510,21): warning C4002: 함수 같은 매크로 호출 'RGB'에 대해 인수가 너무 많습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(509,62): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(509,44): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(514,79): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(514,54): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(523,63): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(523,45): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(529,80): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(529,55): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(532,78): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(532,53): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(550,88): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\winmain.cpp(550,59): warning C4244: '인수': 'float'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
   NGPProjectClient.vcxproj -> C:\Users\user\Desktop\seyoung\git\NGP-TermProject\Client\NGPProjectClient\NGPProjectClient\Debug\NGPProjectClient.exe
