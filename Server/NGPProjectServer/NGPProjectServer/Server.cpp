@@ -13,9 +13,8 @@
 #define SERVER_PORT 9000
 
 #define MAX_ENEMY_BULLET 2000
-#define MAX_PLAYER_BULLET 20
+#define MAX_PLAYER_BULLET 30
 #define MAX_PLAYER 1
-#define FPS 30
 
 enum class GAME_STATE
 {
@@ -41,6 +40,7 @@ typedef struct Player
 typedef struct Enemy
 {
 	int hp;
+	bool Shootbutterfly;
 	Position pos;
 	Position bullets[MAX_ENEMY_BULLET];
 };
@@ -109,7 +109,7 @@ int round_count;
 int PlayerBulletNum[MAX_PLAYER];
 int EnemyBulletNum;
 RECT rect;
-int win = 0;
+int win;
 bool Dondead;
 int imsiDondead;
 int EnemyXMove;
@@ -236,8 +236,9 @@ int main()
 			inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
 
 		client_thread = (HANDLE)_beginthreadex(NULL, 0, ProcessClient, (LPVOID)client_socket, 0, NULL);
-		if (client_thread == NULL)
+		if (client_thread == NULL) 
 			closesocket(client_socket);
+
 		else
 			CloseHandle(client_thread);
 	}
@@ -303,6 +304,7 @@ void InitalizeGameData()
 	frameDelta = 0;
 	lastTime = timeGetTime();
 	EnemyXMove = 3;
+	win = 0;
 	enemy.hp = 200;
 	enemy.pos = { 100.0f, 105.f };
 	PlayerBulletNum[0] = -1;
@@ -312,17 +314,18 @@ void InitalizeGameData()
 	rect.right = 600;
 	rect.top = 0;
 	rect.bottom = 800;
+	enemy.Shootbutterfly = 0;
 	for (auto bullet : enemy.bullets)
 		bullet = { 10000.0f, -10000.0f };
 
-	for (auto player : players)
+	for (int i = 0; i < MAX_PLAYER ; ++i)
 	{
-		player.number = -1;
-		player.hp = 3;
-		player.is_click = false;
-		player.pos = { -10000.0f, -10000.0f };
+		players[i].number = i;
+		players[i].hp = 3;
+		players[i].is_click = false;
+		players[i].pos = { -10000.0f, -10000.0f };
 
-		for (auto bullet : player.bullets)
+		for (auto bullet : players[i].bullets)
 			bullet = { 10000.0f, -10000.0f };
 	}
 }
@@ -341,6 +344,7 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 	
 	clock_t start = clock();
 	DWORD currTime;
+	DWORD FPS = 30;
 	while (true) 
 	{
 		clock_t end = clock();
@@ -376,8 +380,8 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 
 		}
 		currTime = timeGetTime();
-		frameDelta = (currTime - lastTime) * 0.001f;
-		if (frameDelta >= 1 / FPS)
+		frameDelta = (currTime - lastTime) * 000.1f;
+		if (frameDelta >= float(1) / float(FPS))
 		{
 			SendGameState(client_socket);
 			switch (curr_state)
@@ -388,10 +392,10 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 			case GAME_STATE::RUNNING:
 
 				RecvPlayerInfo(client_socket);
-
 				//WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
 				Update();
 				CollisionCheck();
+
 				SendAllPlayerInfo(client_socket);
 				SendEnemyInfo(client_socket);
 				break;
@@ -405,6 +409,8 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 			UpdateGameState();
 			lastTime = currTime;
 		}
+		if (curr_state == GAME_STATE::RUNNING) {
+		}
 	}
 
 	return 0;
@@ -414,14 +420,11 @@ void UpdateGameState()
 {
 	if (num_player == MAX_PLAYER) {
 		curr_state = GAME_STATE::RUNNING;
-		round_count = 1;
+		if(round_count == 0)
+			round_count = 1;
 	}
-	if (enemy.hp <= 0)
+	if (win == -1 || win == 1)
 		curr_state = GAME_STATE::END;
-
-	for (const auto& player : players)
-		if (player.hp < 0)
-			curr_state = GAME_STATE::END;
 }
 
 void SendPlayerNumber(SOCKET sock)
@@ -436,7 +439,7 @@ void SendPlayerNumber(SOCKET sock)
 
 void SendGameState(SOCKET sock)
 {
-	curr_state = GAME_STATE::RUNNING;
+	curr_state = GAME_STATE::RUNNING;	//테스트를 위해 죽지않게 RUNNING으로 일단 설정
 
 	if (!SendData(sock, &curr_state, sizeof(curr_state)))
 		return;
@@ -445,7 +448,6 @@ void SendGameState(SOCKET sock)
 void RecvPlayerInfo(SOCKET sock)
 {
 	int number;
-
 	if (!RecvData(sock, &number))
 		return;
 
@@ -483,6 +485,9 @@ void SendEnemyInfo(SOCKET sock)
 
 	if (!SendData(sock, &enemy.bullets, sizeof(enemy.bullets)))
 		return;
+
+	if (!SendData(sock, &enemy.Shootbutterfly, sizeof(enemy.Shootbutterfly)))
+		return;
 }
 
 void SendLogo(SOCKET socket)
@@ -500,11 +505,7 @@ void SendEnding(SOCKET socket)
 
 void Update()
 {
-	float timeElapsed = 1;
-	
-	static float DoUpdate = 0;
-	DoUpdate += timeElapsed;
-
+	static float count = 0;
 	//움직임 업데이트
 	if (round_count == 1) {
 		enemy.pos.x += EnemyXMove;
@@ -523,9 +524,9 @@ void Update()
 				PlayersBullet[i][j].Move();
 		}
 	}
-
-	if (DoUpdate >= 1.9) {
-		DoUpdate -= 1.9;
+	count++;
+	if (count >= 1.85) {
+		count -= 1.85;
 		//시간별탄막
 		Time += 1;
 
@@ -544,7 +545,6 @@ void Update()
 			}
 		}
 
-		static bool butterfly;
 		static char pattern[10][20] = {
 			"         #         ",
 			"   ###  # #  ###   ",
@@ -798,7 +798,7 @@ void Update()
 			}
 			else if (Time < 250) {}
 			else if (Time < 500) {
-				butterfly = 1;
+				enemy.Shootbutterfly = 1;
 				if (Time % 2 == 0) {
 					EnemyBulletNum++;
 					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
@@ -814,7 +814,7 @@ void Update()
 			}
 			else if (Time < 600) {}
 			else if (Time < 900) {
-				butterfly = 0;
+				enemy.Shootbutterfly = 0;
 				if (Time % 3 == 0) {
 					EnemyBulletNum++;
 					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
@@ -1055,12 +1055,8 @@ void Update()
 				EnemyBullet[EnemyBulletNum].AngleRate = -1;
 			}
 		}
-		if (imsiDondead != 0) {
-			imsiDondead++;
-			if (imsiDondead >= 30)
-				imsiDondead = 0;
-		}
 	}
+
 
 	//정보 넘겨주기 위한 변수에 정리
 	for (int i = 0; i < MAX_PLAYER; i++)
@@ -1085,9 +1081,9 @@ void CollisionCheck()
 			if (PlayersBullet[i][j].Alive == TRUE) {
 				if (round_count == 1) {
 					if ((PlayersBullet[i][j].X > enemy.pos.x - 45) && (PlayersBullet[i][j].X < enemy.pos.x + 45) &&
-						(PlayersBullet[i][j].Y > enemy.pos.y - 75) && (PlayersBullet[i][j].Y < enemy.pos.y + 60)) {
+						(PlayersBullet[i][j].Y > enemy.pos.y - 75) && (PlayersBullet[i][j].Y < enemy.pos.y + 75)) {
 						enemy.hp--;
-						if (enemy.hp < 0) {
+						if (enemy.hp <= 0) {
 							round_count = 2;
 							EnemyBulletNum = 0;
 							enemy.hp = 420;
@@ -1106,7 +1102,7 @@ void CollisionCheck()
 					}
 				}
 				else if (round_count == 2) {
-					if ((PlayersBullet[i][j].X > enemy.pos.x - 45) && (PlayersBullet[i][j].X < enemy.pos.x + 45) && (PlayersBullet[i][j].Y > enemy.pos.y - 75) && (PlayersBullet[i][j].Y < enemy.pos.y + 60)) {
+					if ((PlayersBullet[i][j].X > enemy.pos.x - 45) && (PlayersBullet[i][j].X < enemy.pos.x + 45) && (PlayersBullet[i][j].Y > enemy.pos.y - 75) && (PlayersBullet[i][j].Y < enemy.pos.y + 75)) {
 						enemy.hp--;
 						if (enemy.hp < 0) {
 							win = 1;
@@ -1148,5 +1144,10 @@ void CollisionCheck()
 				}
 			}
 		}
+	}
+	if (imsiDondead != 0) {
+		imsiDondead++;
+		if (imsiDondead >= 60)
+			imsiDondead = 0;
 	}
 }

@@ -13,7 +13,7 @@
 #define SERVERPORT 9000
 
 #define MAX_ENEMY_BULLET 2000
-#define MAX_PLAYER_BULLET 20
+#define MAX_PLAYER_BULLET 30
 #define MAX_PLAYER 1
 
 // 오류 출력 함수
@@ -32,6 +32,8 @@ LPCTSTR Child2 = TEXT("Child2");
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+int win;
+int num_player;
 
 enum class GAME_STATE
 {
@@ -57,6 +59,7 @@ typedef struct Player
 typedef struct Enemy
 {
 	int hp;
+	bool Shootbutterfly;
 	Position pos;
 	Position bullets[MAX_ENEMY_BULLET];
 };
@@ -110,7 +113,7 @@ bool RecvData(SOCKET sock, T* data)
 }
 
 void RecvPlayerNumber(SOCKET sock);
-bool RecvGameState(SOCKET sock);
+void RecvGameState(SOCKET sock);
 void SendPlayerInfo(SOCKET sock);
 void RecvAllPlayerInfo(SOCKET sock);
 void RecvEnemyInfo(SOCKET sock);
@@ -183,6 +186,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 	RecvPlayerNumber(sock);
 
+	//데이터 초기화
+	InitalizeGameData();
+	//
+
 	hWnd = CreateWindow(lpszClass,
 		TEXT("window program"),
 		WS_OVERLAPPEDWINDOW,
@@ -226,9 +233,6 @@ HBITMAP ReimuSpin;	//98,124,76
 HBITMAP Background;
 HBITMAP Button;
 HBITMAP TITLE;
-
-int win;
-int num_player;
 
 void LOGO(HDC hdc,RECT rc) {
 	HDC memdc;
@@ -324,23 +328,26 @@ void LOGO(HDC hdc,RECT rc) {
 void InitalizeGameData()
 {
 	curr_state = GAME_STATE::TITLE;
+	num_player = 0;
+	win = 0;
+	enemy.hp = 200;
 	enemy.pos = { 100.0f, 105.f };
-
+	enemy.Shootbutterfly = 0;
 	for (auto bullet : enemy.bullets)
 		bullet = { 10000.0f, -10000.0f };
 
-	for (auto player : players)
+	for (int i = 0; i < MAX_PLAYER; ++i)
 	{
-		player.hp = 3;
-		player.is_click = false;
-		player.pos = { -10000.0f, -10000.0f };
+		players[i].number = i;
+		players[i].hp = 3;
+		players[i].is_click = false;
+		players[i].pos = { -10000.0f, -10000.0f };
 
-		for (auto bullet : player.bullets)
+		for (auto bullet : players[i].bullets)
 			bullet = { 10000.0f, -10000.0f };
 	}
 }
 
-static bool Dondead;
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 {
 	PAINTSTRUCT ps;
@@ -352,7 +359,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	static RECT rc;
 	static bool start;
 
-	if (RecvGameState(sock)) {
+	static DWORD frameDelta = 0;
+	static DWORD lastTime = timeGetTime();
+	DWORD currTime = timeGetTime();
+	DWORD FPS = 30;
+	frameDelta = (currTime - lastTime) * 000.1f;
+	if (frameDelta >= float(1) / float(FPS)) {
+		lastTime = currTime;
+		RecvGameState(sock);
 		switch (curr_state)
 		{
 		case GAME_STATE::TITLE:
@@ -400,11 +414,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		ReimuSpin = LoadBitmap(g_hInst, MAKEINTRESOURCE(IDB_ReimuSpin));
 		TITLE = LoadBitmap(g_hInst, MAKEINTRESOURCE(IDB_TITLE));
 
-		SetTimer(hWnd, 1, 120, NULL);
+		SetTimer(hWnd, 1, 70, NULL);
 
-		//데이터 초기화
-		InitalizeGameData();
-		//
+		
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
@@ -436,26 +448,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_KEYDOWN:
 		if (start == 0) {
-			start = 1;
+			start = 1; 
 			child_hWnd = CreateWindow(TEXT("Child"), NULL, WS_CHILD | WS_VISIBLE, 50, 30, 600, 800, hWnd, NULL, g_hInst, NULL);
-
 			// score
 			child_hWnd2 = CreateWindow(TEXT("Child2"), NULL, WS_CHILD | WS_VISIBLE, 700, 30, 250, 800, hWnd, NULL, g_hInst, NULL);
 
-			InvalidateRect(hWnd, NULL, TRUE);
-		}
-		else if (wParam == 'z' || wParam == 'Z') {
-			if (Dondead == 1) {
-				Dondead = 0;
-			}
-			else if (Dondead == 0) {
-				Dondead = 1;
-			}
 		}
 		break;
 	case WM_TIMER:
 		if (start == 0) {
 			InvalidateRect(hWnd, NULL, false);
+		}
+		if (start == 1 && num_player >= MAX_PLAYER) {
+			start = 2;
 		}
 		break;
 	case WM_DESTROY:
@@ -467,11 +472,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 }
 
 HFONT hFont, oldFont;
-static int score = 0;
-static int round_count = 1;
-static int life_point = 3;
-static int skill_1_point = 3;
-static int skill_2_point = 3;
+int score = 0;
+int round_count = 1;
+int life_point = 3;
+int skill_1_point = 3;
+int skill_2_point = 3;
 LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	HDC hdc, memDC;
@@ -494,12 +499,13 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		"      #     #      ",
 		"      #     #      "
 	};
-
+	
+	
 	switch (uMsg) {
 
 	case WM_CREATE:
 		GetClientRect(hWnd, &rect);
-		SetTimer(hWnd, 3, 30, NULL);
+		SetTimer(hWnd, 3, 33, NULL);
 		break;
 	case WM_LBUTTONDOWN:
 		players[my_number].is_click = true;
@@ -511,6 +517,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		InvalidateRect(hWnd, NULL, FALSE);
 		break;
 	case WM_PAINT:
+
 		hdc = BeginPaint(hWnd, &ps);
 
 		memDC = BackBuff.GetDC();
@@ -519,13 +526,19 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		FillRect(memDC, &rect, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
 
+
+		if (round_count == 1) {
+			if (enemy.pos.y == 100) {
+				round_count = 2;
+			}
+		}
 		if (win == 1) {
-			Win.TransparentBlt(memDC, 0,200,600,400,
-			0,0,258,194,RGB(8,8,8));
+			Win.TransparentBlt(memDC, 0, 200, 600, 400,
+				0, 0, 258, 194, RGB(8, 8, 8));
 		}
 		else if (win == -1) {
 			GameOver.TransparentBlt(memDC, 0, 0, 600, 800,
-				0, 0, 544, 725,RGB(8,8,8));
+				0, 0, 544, 725, RGB(8, 8, 8));
 		}
 		else if (round_count == 1)
 		{
@@ -533,7 +546,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				0, 0, 600, 442, RGB(255, 255, 255));
 			cirno.TransparentBlt(memDC, enemy.pos.x - 30, enemy.pos.y - 50, 60, 100,
 				0, 0, 300, 500, RGB(255, 0, 0, ));
-			for (int i = 0; i < MAX_ENEMY_BULLET; i++) 
+			for (int i = 0; i < MAX_ENEMY_BULLET; i++)
 			{
 				if (IsAlive(enemy.bullets[i])) {
 					skill1.TransparentBlt(memDC, enemy.bullets[i].x - 10, enemy.bullets[i].y - 10,
@@ -546,12 +559,12 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			flower.TransparentBlt(memDC, 0, 0, 600, 800,
 				0, 0, 600, 644, RGB(255, 255, 255));
 			yuyuko.TransparentBlt(memDC, enemy.pos.x - 30, enemy.pos.y - 50, 60, 100,
-				0 , 0 ,99,143,RGB(47,95,115));
-			for (int i = 0; i < MAX_ENEMY_BULLET; i++) 
+				0, 0, 99, 143, RGB(47, 95, 115));
+			for (int i = 0; i < MAX_ENEMY_BULLET; i++)
 			{
 				if (IsAlive(enemy.bullets[i])) {
-					if (butterfly == 0)
-						skill2.TransparentBlt(memDC, enemy.bullets[i].x - 10, enemy.bullets[i].y - 10, 
+					if (enemy.Shootbutterfly == 0)
+						skill2.TransparentBlt(memDC, enemy.bullets[i].x - 10, enemy.bullets[i].y - 10,
 							20, 20, 0, 0, 40, 40, RGB(250, 250, 250));
 					else
 						Nabi.TransparentBlt(memDC, enemy.bullets[i].x - 20, enemy.bullets[i].y - 20,
@@ -588,7 +601,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_MOUSEMOVE:
 		players[my_number].pos.x = LOWORD(lParam);
 		players[my_number].pos.y = HIWORD(lParam);
-		
+
 		players[my_number].pos.x = Clamp(10.0f, players[my_number].pos.x, 590.0f);
 		players[my_number].pos.y = Clamp(10.0f, players[my_number].pos.y, 790.0f);
 		break;
@@ -596,7 +609,6 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		return 0;
 	}
-
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
@@ -774,11 +786,10 @@ void RecvPlayerNumber(SOCKET sock)
 		return;
 }
 
-bool RecvGameState(SOCKET sock)
+void RecvGameState(SOCKET sock)
 {
-	if (RecvData(sock, &curr_state) != SOCKET_ERROR)
-		return true;
-	return false;
+	if (!RecvData(sock, &curr_state))
+		return;
 }
 
 void SendPlayerInfo(SOCKET sock)
@@ -795,20 +806,18 @@ void SendPlayerInfo(SOCKET sock)
 
 void RecvAllPlayerInfo(SOCKET sock)
 {
-	int number;
-
 	for (int i = 0; i < MAX_PLAYER; ++i)
 	{
-		if (!RecvData(sock, &number))
+		if (!RecvData(sock, &players[i].number))
 			return;
 
-		if (!RecvData(sock, &players[number].hp))
+		if (!RecvData(sock, &players[i].hp))
 			return;
 
-		if (!RecvData(sock, &players[number].pos))
+		if (!RecvData(sock, &players[i].pos))
 			return;
 
-		if (!RecvData(sock, &players[number].bullets))
+		if (!RecvData(sock, &players[i].bullets))
 			return;
 	}
 }
@@ -831,6 +840,9 @@ void RecvEnemyInfo(SOCKET sock)
 		return;
 
 	if (!RecvData(sock, &enemy.bullets))
+		return;
+
+	if (!RecvData(sock, &enemy.Shootbutterfly))
 		return;
 }
 
