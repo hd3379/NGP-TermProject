@@ -12,8 +12,8 @@
 #define SERVERIP   "127.0.0.1"
 #define SERVERPORT 9000
 
-#define MAX_ENEMY_BULLET 200
-#define MAX_PLAYER_BULLET 50
+#define MAX_ENEMY_BULLET 2000
+#define MAX_PLAYER_BULLET 20
 #define MAX_PLAYER 1
 
 // 오류 출력 함수
@@ -110,13 +110,14 @@ bool RecvData(SOCKET sock, T* data)
 }
 
 void RecvPlayerNumber(SOCKET sock);
-void RecvGameState(SOCKET sock);
+bool RecvGameState(SOCKET sock);
 void SendPlayerInfo(SOCKET sock);
 void RecvAllPlayerInfo(SOCKET sock);
 void RecvEnemyInfo(SOCKET sock);
 void RecvLogo(SOCKET socket);
 void RecvEnding(SOCKET socket);
 bool IsAlive(Position bullet);
+void InitalizeGameData();
 float Clamp(float min, float value, float max);
 
 Enemy enemy;
@@ -319,6 +320,26 @@ void LOGO(HDC hdc,RECT rc) {
 	DeleteDC(memdc);
 	DeleteDC(alpa);
 }
+
+void InitalizeGameData()
+{
+	curr_state = GAME_STATE::TITLE;
+	enemy.pos = { 100.0f, 105.f };
+
+	for (auto bullet : enemy.bullets)
+		bullet = { 10000.0f, -10000.0f };
+
+	for (auto player : players)
+	{
+		player.hp = 3;
+		player.is_click = false;
+		player.pos = { -10000.0f, -10000.0f };
+
+		for (auto bullet : player.bullets)
+			bullet = { 10000.0f, -10000.0f };
+	}
+}
+
 static bool Dondead;
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 {
@@ -331,24 +352,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	static RECT rc;
 	static bool start;
 
-	RecvGameState(sock);
-	switch (curr_state)
-	{
-	case GAME_STATE::TITLE:
-		RecvLogo(sock);
-		break;
-	case GAME_STATE::RUNNING:
-		SendPlayerInfo(sock);
-		RecvAllPlayerInfo(sock);
-		RecvEnemyInfo(sock);
-		break;
-	case GAME_STATE::END:
-		RecvEnding(sock);
-		break;
-	default:
-		break;
+	if (RecvGameState(sock)) {
+		switch (curr_state)
+		{
+		case GAME_STATE::TITLE:
+			RecvLogo(sock);
+			break;
+		case GAME_STATE::RUNNING:
+			SendPlayerInfo(sock);
+			RecvAllPlayerInfo(sock);
+			RecvEnemyInfo(sock);
+			break;
+		case GAME_STATE::END:
+			RecvEnding(sock);
+			break;
+		default:
+			break;
+		}
 	}
-
 	switch (iMessage) {
 	case WM_CREATE:
 		GetClientRect(hWnd, &rc);
@@ -380,6 +401,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		TITLE = LoadBitmap(g_hInst, MAKEINTRESOURCE(IDB_TITLE));
 
 		SetTimer(hWnd, 1, 120, NULL);
+
+		//데이터 초기화
+		InitalizeGameData();
+		//
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
@@ -437,6 +462,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		return 0;
 	}
+
 	return(DefWindowProc(hWnd, iMessage, wParam, lParam));
 }
 
@@ -473,7 +499,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_CREATE:
 		GetClientRect(hWnd, &rect);
-		SetTimer(hWnd, 2, 70, NULL);
+		SetTimer(hWnd, 3, 30, NULL);
 		break;
 	case WM_LBUTTONDOWN:
 		players[my_number].is_click = true;
@@ -483,7 +509,6 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_TIMER:
 		InvalidateRect(hWnd, NULL, FALSE);
-
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
@@ -566,7 +591,6 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		
 		players[my_number].pos.x = Clamp(10.0f, players[my_number].pos.x, 590.0f);
 		players[my_number].pos.y = Clamp(10.0f, players[my_number].pos.y, 790.0f);
-
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -750,10 +774,11 @@ void RecvPlayerNumber(SOCKET sock)
 		return;
 }
 
-void RecvGameState(SOCKET sock)
+bool RecvGameState(SOCKET sock)
 {
-	if (!RecvData(sock, &curr_state))
-		return;
+	if (RecvData(sock, &curr_state) != SOCKET_ERROR)
+		return true;
+	return false;
 }
 
 void SendPlayerInfo(SOCKET sock)

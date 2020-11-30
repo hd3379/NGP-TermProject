@@ -1,17 +1,21 @@
 #pragma comment(lib, "ws2_32")
+#pragma comment(lib,"winmm.lib")
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #include <WinSock2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <process.h>
+#include <Windows.h>
 #include <time.h>
+#include <math.h>
 
 #define SERVER_PORT 9000
 
-#define MAX_ENEMY_BULLET 200
-#define MAX_PLAYER_BULLET 50
+#define MAX_ENEMY_BULLET 2000
+#define MAX_PLAYER_BULLET 20
 #define MAX_PLAYER 1
+#define FPS 30
 
 enum class GAME_STATE
 {
@@ -85,8 +89,10 @@ void CBullet::Move() {
 	Speed += SpeedRate;
 
 	//화면밖에 나가면 탄삭제
-	if (X >= 800 || X < 0 || Y >= 600 || Y < 0) {
+	if (X >= 600 || X < 0 || Y >= 800 || Y < 0) {
 		Alive = false;
+		X = 10000.0f;
+		Y = -10000.0f;
 	}
 }
 
@@ -108,6 +114,8 @@ bool Dondead;
 int imsiDondead;
 int EnemyXMove;
 int Time;
+DWORD frameDelta;
+DWORD lastTime;
 
 void error_display(const char* message);
 void error_quit(const char* message);
@@ -291,10 +299,19 @@ void InitalizeGameData()
 {
 	curr_state = GAME_STATE::TITLE;
 	num_player = 0;
-
+	round_count = 0;
+	frameDelta = 0;
+	lastTime = timeGetTime();
+	EnemyXMove = 3;
 	enemy.hp = 200;
 	enemy.pos = { 100.0f, 105.f };
-
+	PlayerBulletNum[0] = -1;
+	PlayerBulletNum[1] = -1;
+	EnemyBulletNum = 0;
+	rect.left = 0;
+	rect.right = 600;
+	rect.top = 0;
+	rect.bottom = 800;
 	for (auto bullet : enemy.bullets)
 		bullet = { 10000.0f, -10000.0f };
 
@@ -321,12 +338,13 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 	getpeername(client_socket, (SOCKADDR*)&client_address, &client_address_length);
 
 	SendPlayerNumber(client_socket);
-
+	
 	clock_t start = clock();
-
+	DWORD currTime;
 	while (true) 
 	{
 		clock_t end = clock();
+
 		//디버그용 출력문
 		if ((end - start) / CLOCKS_PER_SEC >= 2)
 		{
@@ -357,31 +375,36 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 			printf("enemy pos {%.2f, %.2f}\n", enemy.pos.x, enemy.pos.y);
 
 		}
-
-		SendGameState(client_socket);
-		switch (curr_state)
+		currTime = timeGetTime();
+		frameDelta = (currTime - lastTime) * 0.001f;
+		if (frameDelta >= 1 / FPS)
 		{
-		case GAME_STATE::TITLE:
-			SendLogo(client_socket);
-			break;
-		case GAME_STATE::RUNNING:
-			RecvPlayerInfo(client_socket);
+			SendGameState(client_socket);
+			switch (curr_state)
+			{
+			case GAME_STATE::TITLE:
+				SendLogo(client_socket);
+				break;
+			case GAME_STATE::RUNNING:
 
-			//WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+				RecvPlayerInfo(client_socket);
 
-			Update();
-			CollisionCheck();
-			SendAllPlayerInfo(client_socket);
-			SendEnemyInfo(client_socket);
-			break;
-		case GAME_STATE::END:
-			SendEnding(client_socket);
-			break;
-		default:
-			break;
-			
+				//WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+				Update();
+				CollisionCheck();
+				SendAllPlayerInfo(client_socket);
+				SendEnemyInfo(client_socket);
+				break;
+			case GAME_STATE::END:
+				SendEnding(client_socket);
+				break;
+			default:
+				break;
+
+			}
+			UpdateGameState();
+			lastTime = currTime;
 		}
-		UpdateGameState();
 	}
 
 	return 0;
@@ -389,9 +412,10 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 
 void UpdateGameState()
 {
-	if (num_player == MAX_PLAYER)
+	if (num_player == MAX_PLAYER) {
 		curr_state = GAME_STATE::RUNNING;
-
+		round_count = 1;
+	}
 	if (enemy.hp <= 0)
 		curr_state = GAME_STATE::END;
 
@@ -476,6 +500,10 @@ void SendEnding(SOCKET socket)
 
 void Update()
 {
+	float timeElapsed = 1;
+	
+	static float DoUpdate = 0;
+	DoUpdate += timeElapsed;
 
 	//움직임 업데이트
 	if (round_count == 1) {
@@ -485,317 +513,468 @@ void Update()
 			enemy.pos.x += EnemyXMove;
 		}
 	}
-	for (int i = 0; i < EnemyBulletNum; i++) {
+	for (int i = 0; i < MAX_ENEMY_BULLET; i++) {
 		if (EnemyBullet[i].Alive == TRUE)
 			EnemyBullet[i].Move();
 	}
 	for (int i = 0; i < MAX_PLAYER; i++) {
-		for (int j = 0; j < PlayerBulletNum[i]; i++) {
+		for (int j = 0; j < MAX_PLAYER_BULLET; j++) {
 			if (PlayersBullet[i][j].Alive == TRUE)
 				PlayersBullet[i][j].Move();
 		}
 	}
 
-	for (int i = 0; i < MAX_PLAYER; i++) {
-		if (players[i].is_click) {
-			PlayerBulletNum[i]++;
-			if (PlayerBulletNum[i] >= 20)
-				PlayerBulletNum[i] = 0;
-			PlayersBullet[i][PlayerBulletNum[i]].Alive = TRUE;
-			PlayersBullet[i][PlayerBulletNum[i]].X = players[i].pos.x;
-			PlayersBullet[i][PlayerBulletNum[i]].Y = players[i].pos.y;
-			PlayersBullet[i][PlayerBulletNum[i]].Speed = 20;
-			PlayersBullet[i][PlayerBulletNum[i]].SpeedRate = 0;
-			PlayersBullet[i][PlayerBulletNum[i]].Angle = -90;
-			PlayersBullet[i][PlayerBulletNum[i]].AngleRate = 0;
-		}
-	}
+	if (DoUpdate >= 1.9) {
+		DoUpdate -= 1.9;
+		//시간별탄막
+		Time += 1;
 
-	static bool butterfly;
-	static char pattern[10][20] = {
-		"         #         ",
-		"   ###  # #  ###   ",
-		"  #   #     #   #  ",
-		" #    #     #    # ",
-		"#   # #     #  #  #",
-		" #    #     #    # ",
-		"  #             #  ",
-		"   #############   ",
-		"      #     #      ",
-		"      #     #      "
-	};
-	//시간별탄막
-	Time += 1;
-	if (round_count == 1) {
-		if (Time < 30) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 20;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = 90;
-			EnemyBullet[EnemyBulletNum].AngleRate = 0;
-		}
-		else if (Time < 40) {}
-		else if (Time < 70) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 20;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = 90;
-			EnemyBullet[EnemyBulletNum].AngleRate = 0;
-		}
-		else if (Time < 80) {}
-		else if (Time < 110) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 20;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = 90;
-			EnemyBullet[EnemyBulletNum].AngleRate = 0;
-		}
-		else if (Time < 120) {}
-		else if (Time < 160) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 20;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = 90;
-			EnemyBullet[EnemyBulletNum].AngleRate = 0;
-		}
-		else if (Time < 180) {}
-		else if (Time < 260) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 20;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = Time * 3 - 180;
-			EnemyBullet[EnemyBulletNum].AngleRate = 0;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 20;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = Time * 3;
-			EnemyBullet[EnemyBulletNum].AngleRate = 0;
-		}
-		else if (Time < 270) {}
-		else if (Time < 400) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 6;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = Time * 8;
-			EnemyBullet[EnemyBulletNum].AngleRate = 1;
-		}
-		else if (Time < 600) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 6;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = -Time * 8;
-			EnemyBullet[EnemyBulletNum].AngleRate = -1;
-		}
-		else if (Time < 610) {}
-		else if (Time < 800) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 6;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = Time * 8;
-			EnemyBullet[EnemyBulletNum].AngleRate = 1;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 6;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = -Time * 8;
-			EnemyBullet[EnemyBulletNum].AngleRate = -1;
-		}
-		else if (Time < 867) {
-			EnemyXMove = 0;
-			static int enemxplus = 0;
-			static int enemyplus = 0;
-			if (Time < 806) {
-				enemxplus = 20;
-				enemyplus = 20;
+		for (int i = 0; i < MAX_PLAYER; i++) {
+			if (players[i].is_click) {
+				PlayerBulletNum[i]++;
+				if (PlayerBulletNum[i] >= MAX_PLAYER_BULLET)
+					PlayerBulletNum[i] = 0;
+				PlayersBullet[i][PlayerBulletNum[i]].Alive = TRUE;
+				PlayersBullet[i][PlayerBulletNum[i]].X = players[i].pos.x;
+				PlayersBullet[i][PlayerBulletNum[i]].Y = players[i].pos.y;
+				PlayersBullet[i][PlayerBulletNum[i]].Speed = 20;
+				PlayersBullet[i][PlayerBulletNum[i]].SpeedRate = 0;
+				PlayersBullet[i][PlayerBulletNum[i]].Angle = -90;
+				PlayersBullet[i][PlayerBulletNum[i]].AngleRate = 0;
 			}
-			if (Time < 821) {
-				enemy.pos.x += enemxplus;
-				enemy.pos.y += enemyplus;
-			}
-			else if (Time < 836) {
-				enemy.pos.x -= enemxplus;
-				enemy.pos.y -= enemyplus;
-			}
-			else if (Time < 837) {
-				enemxplus = -20;
-				enemyplus = 20;
-			}
-			else if (Time < 854) {
-				enemy.pos.x += enemxplus;
-				enemy.pos.y += enemyplus;
-			}
-			else if (Time < 867) {
-				enemy.pos.x -= enemxplus;
-				enemy.pos.y -= enemyplus;
-			}
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 3;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = 90;
-			EnemyBullet[EnemyBulletNum].AngleRate = 0;
 		}
-		else if (Time < 890) {}
-		else if (Time < 2000) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = rand() % 20 + 2;
-			EnemyBullet[EnemyBulletNum].SpeedRate = rand() % 3;
-			EnemyBullet[EnemyBulletNum].Angle = rand() % 360;
-			EnemyBullet[EnemyBulletNum].AngleRate = rand() % 5;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = rand() % 20 + 2;
-			EnemyBullet[EnemyBulletNum].SpeedRate = rand() % 5;
-			EnemyBullet[EnemyBulletNum].Angle = rand() % 360;
-			EnemyBullet[EnemyBulletNum].AngleRate = rand() % 5;
-		}
-	}
-	else if (round_count == 2) {
-		if (Time < 20) {}
-		else if (Time < 160) {
-			if (Time > 20) {
+
+		static bool butterfly;
+		static char pattern[10][20] = {
+			"         #         ",
+			"   ###  # #  ###   ",
+			"  #   #     #   #  ",
+			" #    #     #    # ",
+			"#   # #     #  #  #",
+			" #    #     #    # ",
+			"  #             #  ",
+			"   #############   ",
+			"      #     #      ",
+			"      #     #      "
+		};
+
+		if (round_count == 1) {
+			if (Time < 30) {
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
-				EnemyBullet[EnemyBulletNum].X = 200;
-				EnemyBullet[EnemyBulletNum].Y = 200;
-				EnemyBullet[EnemyBulletNum].Speed = 2;
-				EnemyBullet[EnemyBulletNum].SpeedRate = 1;
-				EnemyBullet[EnemyBulletNum].Angle = 90;
-				EnemyBullet[EnemyBulletNum].AngleRate = 15;
-			}
-			if (Time > 50) {
-				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
-					EnemyBulletNum = 0;
-				EnemyBullet[EnemyBulletNum].Alive = TRUE;
-				EnemyBullet[EnemyBulletNum].X = 400;
-				EnemyBullet[EnemyBulletNum].Y = 200;
-				EnemyBullet[EnemyBulletNum].Speed = 2;
-				EnemyBullet[EnemyBulletNum].SpeedRate = 1;
-				EnemyBullet[EnemyBulletNum].Angle = 90;
-				EnemyBullet[EnemyBulletNum].AngleRate = -15;
-			}
-			if (Time > 80) {
-				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
-					EnemyBulletNum = 0;
-				EnemyBullet[EnemyBulletNum].Alive = TRUE;
-				EnemyBullet[EnemyBulletNum].X = 200;
-				EnemyBullet[EnemyBulletNum].Y = 600;
-				EnemyBullet[EnemyBulletNum].Speed = 2;
-				EnemyBullet[EnemyBulletNum].SpeedRate = 1;
-				EnemyBullet[EnemyBulletNum].Angle = 0;
-				EnemyBullet[EnemyBulletNum].AngleRate = 15;
-			}
-			if (Time > 120) {
-				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
-					EnemyBulletNum = 0;
-				EnemyBullet[EnemyBulletNum].Alive = TRUE;
-				EnemyBullet[EnemyBulletNum].X = 400;
-				EnemyBullet[EnemyBulletNum].Y = 600;
-				EnemyBullet[EnemyBulletNum].Speed = 2;
-				EnemyBullet[EnemyBulletNum].SpeedRate = 1;
-				EnemyBullet[EnemyBulletNum].Angle = 90;
-				EnemyBullet[EnemyBulletNum].AngleRate = -15;
-			}
-		}
-		else if (Time < 250) {}
-		else if (Time < 500) {
-			butterfly = 1;
-			if (Time % 2 == 0) {
-				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
-					EnemyBulletNum = 0;
-				EnemyBullet[EnemyBulletNum].Alive = TRUE;
-				EnemyBullet[EnemyBulletNum].X = 50;
-				EnemyBullet[EnemyBulletNum].Y = rand() % 800 + 50;
-				EnemyBullet[EnemyBulletNum].Speed = 5;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 20;
 				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-				EnemyBullet[EnemyBulletNum].Angle = 0;
+				EnemyBullet[EnemyBulletNum].Angle = 90;
 				EnemyBullet[EnemyBulletNum].AngleRate = 0;
 			}
-		}
-		else if (Time < 600) {}
-		else if (Time < 900) {
-			butterfly = 0;
-			if (Time % 3 == 0) {
+			else if (Time < 40) {}
+			else if (Time < 70) {
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
 				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
 				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-				EnemyBullet[EnemyBulletNum].Speed = 5;
+				EnemyBullet[EnemyBulletNum].Speed = 20;
 				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-				EnemyBullet[EnemyBulletNum].Angle = Time * 6;
+				EnemyBullet[EnemyBulletNum].Angle = 90;
+				EnemyBullet[EnemyBulletNum].AngleRate = 0;
+			}
+			else if (Time < 80) {}
+			else if (Time < 110) {
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 20;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = 90;
+				EnemyBullet[EnemyBulletNum].AngleRate = 0;
+			}
+			else if (Time < 120) {}
+			else if (Time < 160) {
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 20;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = 90;
+				EnemyBullet[EnemyBulletNum].AngleRate = 0;
+			}
+			else if (Time < 180) {}
+			else if (Time < 260) {
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 20;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = Time * 3 - 180;
+				EnemyBullet[EnemyBulletNum].AngleRate = 0;
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 20;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = Time * 3;
+				EnemyBullet[EnemyBulletNum].AngleRate = 0;
+			}
+			else if (Time < 270) {}
+			else if (Time < 400) {
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 6;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = Time * 8;
+				EnemyBullet[EnemyBulletNum].AngleRate = 1;
+			}
+			else if (Time < 600) {
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 6;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = -Time * 8;
+				EnemyBullet[EnemyBulletNum].AngleRate = -1;
+			}
+			else if (Time < 610) {}
+			else if (Time < 800) {
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 6;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = Time * 8;
 				EnemyBullet[EnemyBulletNum].AngleRate = 1;
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 6;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = -Time * 8;
+				EnemyBullet[EnemyBulletNum].AngleRate = -1;
+			}
+			else if (Time < 867) {
+				EnemyXMove = 0;
+				static int enemxplus = 0;
+				static int enemyplus = 0;
+				if (Time < 806) {
+					enemxplus = 20;
+					enemyplus = 20;
+				}
+				if (Time < 821) {
+					enemy.pos.x += enemxplus;
+					enemy.pos.y += enemyplus;
+				}
+				else if (Time < 836) {
+					enemy.pos.x -= enemxplus;
+					enemy.pos.y -= enemyplus;
+				}
+				else if (Time < 837) {
+					enemxplus = -20;
+					enemyplus = 20;
+				}
+				else if (Time < 854) {
+					enemy.pos.x += enemxplus;
+					enemy.pos.y += enemyplus;
+				}
+				else if (Time < 867) {
+					enemy.pos.x -= enemxplus;
+					enemy.pos.y -= enemyplus;
+				}
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 3;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = 90;
+				EnemyBullet[EnemyBulletNum].AngleRate = 0;
+			}
+			else if (Time < 890) {}
+			else if (Time < 2000) {
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = rand() % 20 + 2;
+				EnemyBullet[EnemyBulletNum].SpeedRate = rand() % 3;
+				EnemyBullet[EnemyBulletNum].Angle = rand() % 360;
+				EnemyBullet[EnemyBulletNum].AngleRate = rand() % 5;
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = rand() % 20 + 2;
+				EnemyBullet[EnemyBulletNum].SpeedRate = rand() % 5;
+				EnemyBullet[EnemyBulletNum].Angle = rand() % 360;
+				EnemyBullet[EnemyBulletNum].AngleRate = rand() % 5;
+			}
+		}
+		else if (round_count == 2) {
+			if (Time < 20) {}
+			else if (Time < 160) {
+				if (Time > 20) {
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = 200;
+					EnemyBullet[EnemyBulletNum].Y = 200;
+					EnemyBullet[EnemyBulletNum].Speed = 2;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 1;
+					EnemyBullet[EnemyBulletNum].Angle = 90;
+					EnemyBullet[EnemyBulletNum].AngleRate = 15;
+				}
+				if (Time > 50) {
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = 400;
+					EnemyBullet[EnemyBulletNum].Y = 200;
+					EnemyBullet[EnemyBulletNum].Speed = 2;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 1;
+					EnemyBullet[EnemyBulletNum].Angle = 90;
+					EnemyBullet[EnemyBulletNum].AngleRate = -15;
+				}
+				if (Time > 80) {
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = 200;
+					EnemyBullet[EnemyBulletNum].Y = 600;
+					EnemyBullet[EnemyBulletNum].Speed = 2;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 1;
+					EnemyBullet[EnemyBulletNum].Angle = 0;
+					EnemyBullet[EnemyBulletNum].AngleRate = 15;
+				}
+				if (Time > 120) {
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = 400;
+					EnemyBullet[EnemyBulletNum].Y = 600;
+					EnemyBullet[EnemyBulletNum].Speed = 2;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 1;
+					EnemyBullet[EnemyBulletNum].Angle = 90;
+					EnemyBullet[EnemyBulletNum].AngleRate = -15;
+				}
+			}
+			else if (Time < 250) {}
+			else if (Time < 500) {
+				butterfly = 1;
+				if (Time % 2 == 0) {
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = 50;
+					EnemyBullet[EnemyBulletNum].Y = rand() % 800 + 50;
+					EnemyBullet[EnemyBulletNum].Speed = 5;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = 0;
+					EnemyBullet[EnemyBulletNum].AngleRate = 0;
+				}
+			}
+			else if (Time < 600) {}
+			else if (Time < 900) {
+				butterfly = 0;
+				if (Time % 3 == 0) {
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+					EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+					EnemyBullet[EnemyBulletNum].Speed = 5;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = Time * 6;
+					EnemyBullet[EnemyBulletNum].AngleRate = 1;
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+					EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+					EnemyBullet[EnemyBulletNum].Speed = 10;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = Time * 6;
+					EnemyBullet[EnemyBulletNum].AngleRate = -1;
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+					EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+					EnemyBullet[EnemyBulletNum].Speed = 10;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 90;
+					EnemyBullet[EnemyBulletNum].AngleRate = 1;
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+					EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+					EnemyBullet[EnemyBulletNum].Speed = 10;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 90;
+					EnemyBullet[EnemyBulletNum].AngleRate = -1;
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+					EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+					EnemyBullet[EnemyBulletNum].Speed = 10;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 180;
+					EnemyBullet[EnemyBulletNum].AngleRate = 1;
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+					EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+					EnemyBullet[EnemyBulletNum].Speed = 10;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 180;
+					EnemyBullet[EnemyBulletNum].AngleRate = -1;
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+					EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+					EnemyBullet[EnemyBulletNum].Speed = 10;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 270;
+					EnemyBullet[EnemyBulletNum].AngleRate = 1;
+					EnemyBulletNum++;
+					if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+						EnemyBulletNum = 0;
+					EnemyBullet[EnemyBulletNum].Alive = TRUE;
+					EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+					EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+					EnemyBullet[EnemyBulletNum].Speed = 10;
+					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+					EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 270;
+					EnemyBullet[EnemyBulletNum].AngleRate = -1;
+				}
+			}
+			else if (Time < 920) {}
+			else if (Time < 930) {
+				static int i = 9;
+				for (int j = 19; j >= 0; j--) {
+					if (pattern[i][j] == '#') {
+						EnemyBulletNum++;
+						if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+							EnemyBulletNum = 0;
+						EnemyBullet[EnemyBulletNum].Alive = TRUE;
+						EnemyBullet[EnemyBulletNum].X = 100 + j * 10;
+						EnemyBullet[EnemyBulletNum].Y = 100;
+						EnemyBullet[EnemyBulletNum].Speed = 10;
+						EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+						EnemyBullet[EnemyBulletNum].Angle = 90;
+						EnemyBullet[EnemyBulletNum].AngleRate = 0;
+					}
+				}
+				i--;
+			}
+			else if (Time < 940) {
+				static int i = 9;
+				for (int j = 19; j >= 0; j--) {
+					if (pattern[i][j] == '#') {
+						EnemyBulletNum++;
+						if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+							EnemyBulletNum = 0;
+						EnemyBullet[EnemyBulletNum].Alive = TRUE;
+						EnemyBullet[EnemyBulletNum].X = 500 + j * 10;
+						EnemyBullet[EnemyBulletNum].Y = 100;
+						EnemyBullet[EnemyBulletNum].Speed = 10;
+						EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+						EnemyBullet[EnemyBulletNum].Angle = 90;
+						EnemyBullet[EnemyBulletNum].AngleRate = 0;
+					}
+				}
+				i--;
+			}
+			else if (Time < 950) {
+				static int i = 9;
+				for (int j = 19; j >= 0; j--) {
+					if (pattern[i][j] == '#') {
+						EnemyBulletNum++;
+						if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+							EnemyBulletNum = 0;
+						EnemyBullet[EnemyBulletNum].Alive = TRUE;
+						EnemyBullet[EnemyBulletNum].X = 100 + j * 10;
+						EnemyBullet[EnemyBulletNum].Y = 100;
+						EnemyBullet[EnemyBulletNum].Speed = 10;
+						EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+						EnemyBullet[EnemyBulletNum].Angle = 90;
+						EnemyBullet[EnemyBulletNum].AngleRate = 0;
+					}
+				}
+				i--;
+			}
+			else if (Time < 960) {
+				static int i = 9;
+				for (int j = 19; j >= 0; j--) {
+					if (pattern[i][j] == '#') {
+						EnemyBulletNum++;
+						if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+							EnemyBulletNum = 0;
+						EnemyBullet[EnemyBulletNum].Alive = TRUE;
+						EnemyBullet[EnemyBulletNum].X = 300 + j * 10;
+						EnemyBullet[EnemyBulletNum].Y = 100;
+						EnemyBullet[EnemyBulletNum].Speed = 10;
+						EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+						EnemyBullet[EnemyBulletNum].Angle = 90;
+						EnemyBullet[EnemyBulletNum].AngleRate = 0;
+					}
+				}
+				i--;
+			}
+			else if (Time < 970) {}
+			else if (Time < 2000) {
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
 				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
@@ -803,9 +982,19 @@ void Update()
 				EnemyBullet[EnemyBulletNum].Speed = 10;
 				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
 				EnemyBullet[EnemyBulletNum].Angle = Time * 6;
+				EnemyBullet[EnemyBulletNum].AngleRate = 1;
+				EnemyBulletNum++;
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
+					EnemyBulletNum = 0;
+				EnemyBullet[EnemyBulletNum].Alive = TRUE;
+				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
+				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
+				EnemyBullet[EnemyBulletNum].Speed = 10;
+				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
+				EnemyBullet[EnemyBulletNum].Angle = -Time * 6;
 				EnemyBullet[EnemyBulletNum].AngleRate = -1;
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
 				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
@@ -815,17 +1004,17 @@ void Update()
 				EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 90;
 				EnemyBullet[EnemyBulletNum].AngleRate = 1;
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
 				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
 				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
 				EnemyBullet[EnemyBulletNum].Speed = 10;
 				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-				EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 90;
+				EnemyBullet[EnemyBulletNum].Angle = -Time * 6 - 90;
 				EnemyBullet[EnemyBulletNum].AngleRate = -1;
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
 				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
@@ -835,17 +1024,17 @@ void Update()
 				EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 180;
 				EnemyBullet[EnemyBulletNum].AngleRate = 1;
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
 				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
 				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
 				EnemyBullet[EnemyBulletNum].Speed = 10;
 				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-				EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 180;
+				EnemyBullet[EnemyBulletNum].Angle = -Time * 6 - 180;
 				EnemyBullet[EnemyBulletNum].AngleRate = -1;
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
 				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
@@ -855,185 +1044,34 @@ void Update()
 				EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 270;
 				EnemyBullet[EnemyBulletNum].AngleRate = 1;
 				EnemyBulletNum++;
-				if (EnemyBulletNum >= 2000)
+				if (EnemyBulletNum >= MAX_ENEMY_BULLET)
 					EnemyBulletNum = 0;
 				EnemyBullet[EnemyBulletNum].Alive = TRUE;
 				EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
 				EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
 				EnemyBullet[EnemyBulletNum].Speed = 10;
 				EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-				EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 270;
+				EnemyBullet[EnemyBulletNum].Angle = -Time * 6 - 270;
 				EnemyBullet[EnemyBulletNum].AngleRate = -1;
 			}
 		}
-		else if (Time < 920) {}
-		else if (Time < 930) {
-			static int i = 9;
-			for (int j = 19; j >= 0; j--) {
-				if (pattern[i][j] == '#') {
-					EnemyBulletNum++;
-					if (EnemyBulletNum >= 2000)
-						EnemyBulletNum = 0;
-					EnemyBullet[EnemyBulletNum].Alive = TRUE;
-					EnemyBullet[EnemyBulletNum].X = 100 + j * 10;
-					EnemyBullet[EnemyBulletNum].Y = 100;
-					EnemyBullet[EnemyBulletNum].Speed = 10;
-					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-					EnemyBullet[EnemyBulletNum].Angle = 90;
-					EnemyBullet[EnemyBulletNum].AngleRate = 0;
-				}
-			}
-			i--;
-		}
-		else if (Time < 940) {
-			static int i = 9;
-			for (int j = 19; j >= 0; j--) {
-				if (pattern[i][j] == '#') {
-					EnemyBulletNum++;
-					if (EnemyBulletNum >= 2000)
-						EnemyBulletNum = 0;
-					EnemyBullet[EnemyBulletNum].Alive = TRUE;
-					EnemyBullet[EnemyBulletNum].X = 500 + j * 10;
-					EnemyBullet[EnemyBulletNum].Y = 100;
-					EnemyBullet[EnemyBulletNum].Speed = 10;
-					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-					EnemyBullet[EnemyBulletNum].Angle = 90;
-					EnemyBullet[EnemyBulletNum].AngleRate = 0;
-				}
-			}
-			i--;
-		}
-		else if (Time < 950) {
-			static int i = 9;
-			for (int j = 19; j >= 0; j--) {
-				if (pattern[i][j] == '#') {
-					EnemyBulletNum++;
-					if (EnemyBulletNum >= 2000)
-						EnemyBulletNum = 0;
-					EnemyBullet[EnemyBulletNum].Alive = TRUE;
-					EnemyBullet[EnemyBulletNum].X = 100 + j * 10;
-					EnemyBullet[EnemyBulletNum].Y = 100;
-					EnemyBullet[EnemyBulletNum].Speed = 10;
-					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-					EnemyBullet[EnemyBulletNum].Angle = 90;
-					EnemyBullet[EnemyBulletNum].AngleRate = 0;
-				}
-			}
-			i--;
-		}
-		else if (Time < 960) {
-			static int i = 9;
-			for (int j = 19; j >= 0; j--) {
-				if (pattern[i][j] == '#') {
-					EnemyBulletNum++;
-					if (EnemyBulletNum >= 2000)
-						EnemyBulletNum = 0;
-					EnemyBullet[EnemyBulletNum].Alive = TRUE;
-					EnemyBullet[EnemyBulletNum].X = 300 + j * 10;
-					EnemyBullet[EnemyBulletNum].Y = 100;
-					EnemyBullet[EnemyBulletNum].Speed = 10;
-					EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-					EnemyBullet[EnemyBulletNum].Angle = 90;
-					EnemyBullet[EnemyBulletNum].AngleRate = 0;
-				}
-			}
-			i--;
-		}
-		else if (Time < 970) {}
-		else if (Time < 2000) {
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 10;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = Time * 6;
-			EnemyBullet[EnemyBulletNum].AngleRate = 1;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 10;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = -Time * 6;
-			EnemyBullet[EnemyBulletNum].AngleRate = -1;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 10;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 90;
-			EnemyBullet[EnemyBulletNum].AngleRate = 1;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 10;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = -Time * 6 - 90;
-			EnemyBullet[EnemyBulletNum].AngleRate = -1;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 10;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 180;
-			EnemyBullet[EnemyBulletNum].AngleRate = 1;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 10;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = -Time * 6 - 180;
-			EnemyBullet[EnemyBulletNum].AngleRate = -1;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 10;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = Time * 6 - 270;
-			EnemyBullet[EnemyBulletNum].AngleRate = 1;
-			EnemyBulletNum++;
-			if (EnemyBulletNum >= 2000)
-				EnemyBulletNum = 0;
-			EnemyBullet[EnemyBulletNum].Alive = TRUE;
-			EnemyBullet[EnemyBulletNum].X = enemy.pos.x;
-			EnemyBullet[EnemyBulletNum].Y = enemy.pos.y;
-			EnemyBullet[EnemyBulletNum].Speed = 10;
-			EnemyBullet[EnemyBulletNum].SpeedRate = 0;
-			EnemyBullet[EnemyBulletNum].Angle = -Time * 6 - 270;
-			EnemyBullet[EnemyBulletNum].AngleRate = -1;
+		if (imsiDondead != 0) {
+			imsiDondead++;
+			if (imsiDondead >= 30)
+				imsiDondead = 0;
 		}
 	}
 
 	//정보 넘겨주기 위한 변수에 정리
 	for (int i = 0; i < MAX_PLAYER; i++)
 	{
-		for (int j = 0; j < PlayerBulletNum[i]; j++)
+		for (int j = 0; j < MAX_PLAYER_BULLET; j++)
 		{
 			players[i].bullets[j].x = PlayersBullet[i][j].X;
 			players[i].bullets[j].y = PlayersBullet[i][j].Y;
 		}
 	}
-	for (int j = 0; j < EnemyBulletNum; j++)
+	for (int j = 0; j < MAX_ENEMY_BULLET; j++)
 	{
 		enemy.bullets[j].x = EnemyBullet[j].X;
 		enemy.bullets[j].y = EnemyBullet[j].Y;
@@ -1043,7 +1081,7 @@ void Update()
 void CollisionCheck()
 {
 	for (int i = 0; i < MAX_PLAYER; i++) {
-		for (int j = 0; j < PlayerBulletNum[i]; i++) {
+		for (int j = 0; j < PlayerBulletNum[i]; j++) {
 			if (PlayersBullet[i][j].Alive == TRUE) {
 				if (round_count == 1) {
 					if ((PlayersBullet[i][j].X > enemy.pos.x - 45) && (PlayersBullet[i][j].X < enemy.pos.x + 45) &&
@@ -1056,11 +1094,15 @@ void CollisionCheck()
 							enemy.pos.x = 310;
 							enemy.pos.y = 100;
 							Time = 0;
-							for (int i = 0; i < 2000; i++) {
+							for (int i = 0; i < MAX_ENEMY_BULLET; i++) {
 								EnemyBullet[i].Alive = false;
+								EnemyBullet[i].X = 10000.0f;
+								EnemyBullet[i].Y = -10000.0f;
 							}
 						}
 						PlayersBullet[i][j].Alive = false;
+						PlayersBullet[i][j].X = 10000.0f;
+						PlayersBullet[i][j].Y = -10000.0f;
 					}
 				}
 				else if (round_count == 2) {
@@ -1070,11 +1112,15 @@ void CollisionCheck()
 							win = 1;
 							EnemyBulletNum = 0;
 							Time = 0;
-							for (int i = 0; i < 2000; i++) {
+							for (int i = 0; i < MAX_ENEMY_BULLET; i++) {
 								EnemyBullet[i].Alive = false;
+								EnemyBullet[i].X = 10000.0f;
+								EnemyBullet[i].Y = -10000.0f;
 							}
 						}
 						PlayersBullet[i][j].Alive = false;
+						PlayersBullet[i][j].X = 10000.0f;
+						PlayersBullet[i][j].Y = -10000.0f;
 					}
 				}
 			}
@@ -1095,15 +1141,12 @@ void CollisionCheck()
 								imsiDondead = 1;
 							}
 							EnemyBullet[i].Alive = false;
+							EnemyBullet[i].X = 10000.0f;
+							EnemyBullet[i].Y = -10000.0f;
 						}
 					}
 				}
 			}
 		}
-	}
-	if (imsiDondead != 0) {
-		imsiDondead++;
-		if (imsiDondead >= 10)
-			imsiDondead = 0;
 	}
 }
