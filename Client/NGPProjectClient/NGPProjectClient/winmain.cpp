@@ -582,18 +582,20 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		for (int i = 0; i < MAX_PLAYER; ++i)
 		{
-			reimu.TransparentBlt(memDC, (int)players[i].pos.x - 19, (int)players[i].pos.y - 35, 41, 85,
-				0, 0, 100, 216, RGB(255, 255, 255));
+			if (!players->hp > 0) {
+				reimu.TransparentBlt(memDC, (int)players[i].pos.x - 19, (int)players[i].pos.y - 35, 41, 85,
+					0, 0, 100, 216, RGB(255, 255, 255));
 
-			core.TransparentBlt(memDC, (int)players[i].pos.x - 8, (int)players[i].pos.y - 8, 16, 16,
-				0, 0, 320, 320, RGB(255, 255, 255));
+				core.TransparentBlt(memDC, (int)players[i].pos.x - 8, (int)players[i].pos.y - 8, 16, 16,
+					0, 0, 320, 320, RGB(255, 255, 255));
 
-			for (int j = 0; j < MAX_PLAYER_BULLET; j++)
-			{
-				if (IsAlive(players[i].bullets[j]))
+				for (int j = 0; j < MAX_PLAYER_BULLET; j++)
 				{
-					Bujuck.TransparentBlt(memDC, players[i].bullets[j].x - 7, players[i].bullets[j].y - 10,
-						15, 20, 0, 0, 228, 490, RGB(255, 255, 255));
+					if (IsAlive(players[i].bullets[j]))
+					{
+						Bujuck.TransparentBlt(memDC, players[i].bullets[j].x - 7, players[i].bullets[j].y - 10,
+							15, 20, 0, 0, 228, 490, RGB(255, 255, 255));
+					}
 				}
 			}
 		}

@@ -118,7 +118,7 @@ int EnemyXMove;
 int Time;
 DWORD frameDelta;
 DWORD lastTime;
-
+int LivePlayer;
 void error_display(const char* message);
 void error_quit(const char* message);
 int recvn(SOCKET socket, char* buffer, int length, int flags);
@@ -308,6 +308,7 @@ void InitalizeGameData()
 	lastTime = timeGetTime();
 	EnemyXMove = 3;
 	win = 0;
+	LivePlayer = 0;
 	enemy.hp = 200;
 	enemy.pos = { 100.0f, 105.f };
 	PlayerBulletNum[0] = -1;
@@ -431,6 +432,7 @@ void UpdateGameState()
 		curr_state = GAME_STATE::RUNNING;
 		if(round_count == 0)
 			round_count = 1;
+		LivePlayer = MAX_PLAYER;
 	}
 	if (win == -1 || win == 1)
 		curr_state = GAME_STATE::END;
@@ -1147,19 +1149,24 @@ void CollisionCheck()
 	for (int i = 0; i < EnemyBulletNum; i++) {
 		if (EnemyBullet[i].Alive == TRUE) {
 			for (int j = 0; j < MAX_PLAYER; j++) {
-				if (sqrt(pow(players[j].pos.x - EnemyBullet[i].X, 2.0f) + pow(players[j].pos.y - EnemyBullet[i].Y, 2.0f)) < 26) {
-					if (Dondead == 0) {
-						if (imsiDondead == 0) {
-							players[j].hp--;
-							if (players[j].hp <= 0)
-								win = -1;
-							else
-							{
-								imsiDondead = 1;
+				if (players[j].hp > 0) {
+					if (sqrt(pow(players[j].pos.x - EnemyBullet[i].X, 2) + pow(players[j].pos.y - EnemyBullet[i].Y, 2)) < 26) {
+						if (Dondead == 0) {
+							if (imsiDondead == 0) {
+								players[j].hp--;
+								if (players[j].hp <= 0) {
+									LivePlayer--;
+									if (LivePlayer <= 0)
+										win = -1;
+								}
+								else
+								{
+									imsiDondead = 1;
+								}
+								EnemyBullet[i].Alive = false;
+								EnemyBullet[i].X = 10000.0f;
+								EnemyBullet[i].Y = -10000.0f;
 							}
-							EnemyBullet[i].Alive = false;
-							EnemyBullet[i].X = 10000.0f;
-							EnemyBullet[i].Y = -10000.0f;
 						}
 					}
 				}
