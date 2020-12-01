@@ -9,7 +9,7 @@
 #include <mmsystem.h>
 #include "resource.h"
 
-#define SERVERIP   "192.168.183.169"
+#define SERVERIP   "172.30.1.6"
 #define SERVERPORT 9000
 
 #define MAX_ENEMY_BULLET 2000
@@ -457,9 +457,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		if (start == 0) {
 			InvalidateRect(hWnd, NULL, false);
 		}
-		if (start == 1 && num_player >= MAX_PLAYER) {
-			start = 2;
-		}
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -582,7 +579,7 @@ LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		for (int i = 0; i < MAX_PLAYER; ++i)
 		{
-			if (!players->hp > 0) {
+			if (players[i].hp > 0) {
 				reimu.TransparentBlt(memDC, (int)players[i].pos.x - 19, (int)players[i].pos.y - 35, 41, 85,
 					0, 0, 100, 216, RGB(255, 255, 255));
 

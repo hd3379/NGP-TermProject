@@ -116,8 +116,6 @@ bool Dondead;
 int imsiDondead;
 int EnemyXMove;
 int Time;
-DWORD frameDelta;
-DWORD lastTime;
 int LivePlayer;
 void error_display(const char* message);
 void error_quit(const char* message);
@@ -304,8 +302,6 @@ void InitalizeGameData()
 	curr_state = GAME_STATE::TITLE;
 	num_player = 0;
 	round_count = 0;
-	frameDelta = 0;
-	lastTime = timeGetTime();
 	EnemyXMove = 3;
 	win = 0;
 	LivePlayer = 0;
@@ -347,6 +343,9 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 
 	SendPlayerNumber(client_socket);
 	
+
+	static DWORD frameDelta = 0;
+	static DWORD lastTime = timeGetTime();
 	clock_t start = clock();
 	DWORD currTime;
 	DWORD FPS = 30;
@@ -398,7 +397,7 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 			case GAME_STATE::RUNNING:
 
 				RecvPlayerInfo(client_socket);
-				//WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
+				WaitForMultipleObjects(2, &client_thread, TRUE, INFINITE);
 				Update();
 				CollisionCheck();
 
@@ -428,7 +427,7 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 
 void UpdateGameState()
 {
-	if (players[0].is_ready && players[1].is_ready) {
+	if (curr_state == GAME_STATE::TITLE && players[0].is_ready && players[1].is_ready) {
 		curr_state = GAME_STATE::RUNNING;
 		if(round_count == 0)
 			round_count = 1;
