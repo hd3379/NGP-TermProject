@@ -3,18 +3,18 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <winsock2.h>
 #include <stdlib.h>
-#include<windows.h>
-#include<math.h>
+#include <windows.h>
+#include <math.h>
 #include <atlImage.h> 
 #include <mmsystem.h>
 #include "resource.h"
 
-#define SERVERIP   "127.0.0.1"
+#define SERVERIP   "192.168.183.169"
 #define SERVERPORT 9000
 
 #define MAX_ENEMY_BULLET 2000
 #define MAX_PLAYER_BULLET 30
-#define MAX_PLAYER 1
+#define MAX_PLAYER 2
 
 // 오류 출력 함수
 void err_quit(char* msg);
@@ -52,6 +52,7 @@ typedef struct Player
 	int number;
 	int hp;
 	bool is_click;
+	bool is_ready;
 	Position pos;
 	Position bullets[MAX_PLAYER_BULLET];
 };
@@ -118,7 +119,8 @@ void SendPlayerInfo(SOCKET sock);
 void RecvAllPlayerInfo(SOCKET sock);
 void RecvEnemyInfo(SOCKET sock);
 void RecvLogo(SOCKET socket);
-void RecvEnding(SOCKET socket);
+void RecvEnding(SOCKET sock);
+void SendReady(SOCKET socket);
 bool IsAlive(Position bullet);
 void InitalizeGameData();
 float Clamp(float min, float value, float max);
@@ -341,6 +343,7 @@ void InitalizeGameData()
 		players[i].number = i;
 		players[i].hp = 3;
 		players[i].is_click = false;
+		players[i].is_ready = false;
 		players[i].pos = { -10000.0f, -10000.0f };
 
 		for (auto bullet : players[i].bullets)
@@ -371,6 +374,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		{
 		case GAME_STATE::TITLE:
 			RecvLogo(sock);
+			SendReady(sock);
 			break;
 		case GAME_STATE::RUNNING:
 			SendPlayerInfo(sock);
@@ -447,13 +451,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		DeleteObject(memBoard);
 		break;
 	case WM_KEYDOWN:
-		if (start == 0) {
-			start = 1; 
-			child_hWnd = CreateWindow(TEXT("Child"), NULL, WS_CHILD | WS_VISIBLE, 50, 30, 600, 800, hWnd, NULL, g_hInst, NULL);
-			// score
-			child_hWnd2 = CreateWindow(TEXT("Child2"), NULL, WS_CHILD | WS_VISIBLE, 700, 30, 250, 800, hWnd, NULL, g_hInst, NULL);
-
-		}
+		players[my_number].is_ready = true;
 		break;
 	case WM_TIMER:
 		if (start == 0) {
@@ -466,6 +464,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
+	}
+
+	if (start == 0 && curr_state == GAME_STATE::RUNNING) {
+		start = 1;
+
+		child_hWnd = CreateWindow(TEXT("Child"), NULL, WS_CHILD | WS_VISIBLE, 50, 30, 600, 800, hWnd, NULL, g_hInst, NULL);
+		// score
+		child_hWnd2 = CreateWindow(TEXT("Child2"), NULL, WS_CHILD | WS_VISIBLE, 700, 30, 250, 800, hWnd, NULL, g_hInst, NULL);
+
 	}
 
 	return(DefWindowProc(hWnd, iMessage, wParam, lParam));
@@ -831,6 +838,15 @@ void RecvLogo(SOCKET socket)
 void RecvEnding(SOCKET socket)
 {
 	if (!RecvData(sock, &win))
+		return;
+}
+
+void SendReady(SOCKET sock)
+{
+	if (!SendData(sock, &my_number, sizeof(my_number)))
+		return;
+
+	if (!SendData(sock, &players[my_number].is_ready, sizeof(players[my_number].is_ready)))
 		return;
 }
 

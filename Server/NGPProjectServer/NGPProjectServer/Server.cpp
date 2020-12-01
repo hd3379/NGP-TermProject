@@ -14,7 +14,7 @@
 
 #define MAX_ENEMY_BULLET 2000
 #define MAX_PLAYER_BULLET 30
-#define MAX_PLAYER 1
+#define MAX_PLAYER 2
 
 enum class GAME_STATE
 {
@@ -33,6 +33,7 @@ typedef struct Player
 	int number;
 	int hp;
 	bool is_click;
+	bool is_ready;
 	Position pos;
 	Position bullets[MAX_PLAYER_BULLET];
 };
@@ -110,6 +111,7 @@ int PlayerBulletNum[MAX_PLAYER];
 int EnemyBulletNum;
 RECT rect;
 int win;
+bool is_all_ready = false;
 bool Dondead;
 int imsiDondead;
 int EnemyXMove;
@@ -180,6 +182,7 @@ void CollisionCheck();
 void Update();
 void SendLogo(SOCKET socket);
 void SendEnding(SOCKET socket);
+void RecvReady(SOCKET socket);
 
 unsigned WINAPI ProcessClient(LPVOID arg);
 
@@ -323,6 +326,7 @@ void InitalizeGameData()
 		players[i].number = i;
 		players[i].hp = 3;
 		players[i].is_click = false;
+		players[i].is_ready = false;
 		players[i].pos = { -10000.0f, -10000.0f };
 
 		for (auto bullet : players[i].bullets)
@@ -388,6 +392,7 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 			{
 			case GAME_STATE::TITLE:
 				SendLogo(client_socket);
+				RecvReady(client_socket);
 				break;
 			case GAME_STATE::RUNNING:
 
@@ -413,12 +418,16 @@ unsigned WINAPI ProcessClient(LPVOID arg)
 		}
 	}
 
+	EnterCriticalSection(&cs);
+	num_player--;
+	LeaveCriticalSection(&cs);
+
 	return 0;
 }
 
 void UpdateGameState()
 {
-	if (num_player == MAX_PLAYER) {
+	if (players[0].is_ready && players[1].is_ready) {
 		curr_state = GAME_STATE::RUNNING;
 		if(round_count == 0)
 			round_count = 1;
@@ -439,7 +448,7 @@ void SendPlayerNumber(SOCKET sock)
 
 void SendGameState(SOCKET sock)
 {
-	curr_state = GAME_STATE::RUNNING;	//테스트를 위해 죽지않게 RUNNING으로 일단 설정
+	//curr_state = GAME_STATE::RUNNING;	//테스트를 위해 죽지않게 RUNNING으로 일단 설정
 
 	if (!SendData(sock, &curr_state, sizeof(curr_state)))
 		return;
@@ -502,6 +511,18 @@ void SendEnding(SOCKET socket)
 	if (!SendData(socket, &win, sizeof(win)))
 		return;
 }
+
+void RecvReady(SOCKET socket)
+{
+	int number;
+
+	if (!RecvData(socket, &number))
+		return;
+
+	if (!RecvData(socket, &players[number].is_ready))
+		return;
+}
+
 
 void Update()
 {
@@ -1077,7 +1098,7 @@ void Update()
 void CollisionCheck()
 {
 	for (int i = 0; i < MAX_PLAYER; i++) {
-		for (int j = 0; j < PlayerBulletNum[i]; j++) {
+		for (int j = 0; j < MAX_PLAYER_BULLET; j++) {
 			if (PlayersBullet[i][j].Alive == TRUE) {
 				if (round_count == 1) {
 					if ((PlayersBullet[i][j].X > enemy.pos.x - 45) && (PlayersBullet[i][j].X < enemy.pos.x + 45) &&
@@ -1126,7 +1147,7 @@ void CollisionCheck()
 	for (int i = 0; i < EnemyBulletNum; i++) {
 		if (EnemyBullet[i].Alive == TRUE) {
 			for (int j = 0; j < MAX_PLAYER; j++) {
-				if (sqrt(pow(players[j].pos.x - EnemyBullet[i].X, 2) + pow(players[j].pos.y - EnemyBullet[i].Y, 2)) < 26) {
+				if (sqrt(pow(players[j].pos.x - EnemyBullet[i].X, 2.0f) + pow(players[j].pos.y - EnemyBullet[i].Y, 2.0f)) < 26) {
 					if (Dondead == 0) {
 						if (imsiDondead == 0) {
 							players[j].hp--;
