@@ -9,7 +9,7 @@
 #include <mmsystem.h>
 #include "resource.h"
 
-#define SERVERIP   "172.30.1.6"
+#define SERVERIP   "172.30.1.12"
 #define SERVERPORT 9000
 
 #define MAX_ENEMY_BULLET 2000
@@ -32,8 +32,6 @@ LPCTSTR Child2 = TEXT("Child2");
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-int win;
-int num_player;
 
 enum class GAME_STATE
 {
@@ -129,6 +127,9 @@ Enemy enemy;
 Player players[MAX_PLAYER];
 GAME_STATE curr_state;
 int my_number;
+int win;
+int num_player;
+int round_count;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	LPSTR lpszCmdParam, int nCmdShow)
@@ -335,6 +336,7 @@ void InitalizeGameData()
 	enemy.hp = 200;
 	enemy.pos = { 100.0f, 105.f };
 	enemy.Shootbutterfly = 0;
+	round_count = 1;
 	for (auto bullet : enemy.bullets)
 		bullet = { 10000.0f, -10000.0f };
 
@@ -475,12 +477,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	return(DefWindowProc(hWnd, iMessage, wParam, lParam));
 }
 
-HFONT hFont, oldFont;
-int score = 0;
-int round_count = 1;
-int life_point = 3;
-int skill_1_point = 3;
-int skill_2_point = 3;
 LRESULT CALLBACK ChildProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	HDC hdc, memDC;
@@ -622,9 +618,14 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	HDC hdc, memDC;
 	PAINTSTRUCT ps;
+	HFONT hFont, oldFont;
 	static RECT rect;
 	TCHAR str[10];
 	TCHAR debugstringA[40], debugstringB[40], debugstringC[40];
+	static int score = 0;
+	static int life_point = 3;
+	static int skill_1_point = 3;
+	static int skill_2_point = 3;
 
 	switch (uMsg) {
 
@@ -703,11 +704,10 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		wsprintf(str, TEXT("%d"), score);
 		TextOut(memDC, 150, 100, str, lstrlen(str));
 
+		_stprintf(debugstringA, TEXT("nump %d mynum %d"), num_player, my_number+1);
+		TextOut(memDC, 10, 300, debugstringA, lstrlen(debugstringA));
 		for (int i = 0; i < MAX_PLAYER; ++i)
 		{
-			_stprintf(debugstringA, TEXT("nump %d mynum %d"), num_player, my_number);
-			TextOut(memDC, 10, 300 + i*20, debugstringA, lstrlen(debugstringA));
-
 			_stprintf(debugstringB, TEXT("%dP {%d, %d} c %d"), 
 				i + 1, (int)players[i].pos.x, (int)players[i].pos.y, players[i].is_click);
 			TextOut(memDC, 10, 360 + i*20, debugstringB, lstrlen(debugstringB));
