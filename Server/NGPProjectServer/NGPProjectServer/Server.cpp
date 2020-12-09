@@ -118,6 +118,11 @@ int EnemyXMove;
 int Time;
 int LivePlayer;
 
+
+void error_display(const char* message);
+void error_quit(const char* message);
+int recvn(SOCKET socket, char* buffer, int length, int flags);
+
 template<class T>
 bool SendData(SOCKET sock, T* data, int len)
 {
@@ -178,11 +183,6 @@ void Update();
 void SendLogo(SOCKET socket);
 void SendEnding(SOCKET socket);
 void RecvReady(SOCKET socket);
-
-void error_display(const char* message);
-void error_quit(const char* message);
-int recvn(SOCKET socket, char* buffer, int length, int flags);
-
 
 unsigned WINAPI ProcessClient(LPVOID arg);
 

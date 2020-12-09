@@ -9,7 +9,7 @@
 #include <mmsystem.h>
 #include "resource.h"
 
-#define SERVERIP   "172.30.1.12"
+#define SERVERIP   "192.168.182.212"
 #define SERVERPORT 9000
 
 #define MAX_ENEMY_BULLET 2000
@@ -703,7 +703,9 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		wsprintf(str, TEXT("%d"), score);
 		TextOut(memDC, 150, 100, str, lstrlen(str));
-
+		
+		//디버그용
+		/*
 		_stprintf(debugstringA, TEXT("nump %d mynum %d"), num_player, my_number+1);
 		TextOut(memDC, 10, 300, debugstringA, lstrlen(debugstringA));
 		for (int i = 0; i < MAX_PLAYER; ++i)
@@ -715,10 +717,10 @@ LRESULT CALLBACK ChildProc2(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			printf("%dP pos {%.1f, %.1f} c %d\n",
 				i + 1, players[i].pos.x, players[i].pos.y, players[i].is_click);
 		}
-
+		
 		_stprintf(debugstringC, TEXT("e pos {%d, %d}"), (int)enemy.pos.x, (int)enemy.pos.y);
 		TextOut(memDC, 10, 400, debugstringC, lstrlen(debugstringC));
-
+		*/
 		SelectObject(memDC, oldFont);
 		DeleteObject(hFont);
 
